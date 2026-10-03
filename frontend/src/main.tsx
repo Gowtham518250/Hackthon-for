@@ -527,6 +527,7 @@ function Dashboard(){
   const[query,setQuery]=useState("");
   const[loading,setLoading]=useState(false);
   const[uploading,setUploading]=useState(false);
+  const[reindexing,setReindexing]=useState(false);
   const[msg,setMsg]=useState("");
   const[filter,setFilter]=useState("All");
   const inputRef=React.useRef<HTMLInputElement>(null);
@@ -602,6 +603,21 @@ function Dashboard(){
     if(!selectedFile)return;
     try{await api.deleteFile(selectedFile.id);setSelectedFile(null);await load()}
     catch(e:any){setMsg(e.message)}
+  }
+
+  async function reindexFile(){
+    if(!selectedFile||reindexing)return;
+    setReindexing(true);setMsg("Re-indexing "+selectedFile.name+" with the latest extractor and chunker…");
+    try{
+      const d=await api.reindexFile(selectedFile.id);
+      setMsg(d.name+" re-indexed · "+d.chunks+" chunks · "+d.embedding_chunks+" semantic vectors");
+      const detail=await api.file(selectedFile.id);
+      setSelectedFile(detail.file);
+      await load();
+      const c=await api.chunks(selectedFile.id);
+      setSelectedChunks(c.chunks||[]);
+    }catch(e:any){setMsg("Re-index failed: "+e.message)}
+    finally{setReindexing(false)}
   }
 
   function scrollSearch(){inputRef.current?.focus();window.scrollTo({top:0,behavior:"smooth"})}
