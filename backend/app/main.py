@@ -1,7 +1,7 @@
 import uuid
 import logging
 from collections import defaultdict, deque
-from datetime import timedelta
+from datetime import timedelta, timezone
 from pathlib import Path
 
 import jwt
@@ -12,6 +12,17 @@ from pydantic import BaseModel, EmailStr, Field
 from .config import settings
 from .db import init_db, one, all_, exe, jd, jl, now, is_postgres
 from .security import hash_password, verify_password, create_token, decode
+from .email_service import send_email, otp_email
+from .otp import (
+    OTP_EXPIRE_MINUTES,
+    OTP_MAX_ATTEMPTS,
+    OTP_RESEND_SECONDS,
+    hash_otp,
+    new_otp,
+    parse_iso,
+    utcnow,
+    iso,
+)
 from .ingest import extract
 from .chunking import chunk_document
 from .search import search, bump_search_version
@@ -125,6 +136,8 @@ def health():
             "rate_limits": True,
             "llm_provider": "groq",
             "llm_model": settings.groq_model,
+            "email_provider": settings.email_provider,
+            "otp": "email_otp_10m_5_attempts",
         },
     }
 
@@ -132,16 +145,57 @@ def health():
 @app.post("/api/auth/register")
 def register(b: Register, request: Request):
     rate_limit(request, "register", 10)
-    e = b.email.lower()
-    if one("SELECT id FROM users WHERE email=?", (e,)):
-        raise HTTPException(409, "Account exists")
+    email = b.email.lower().strip()
+
+    if one("SELECT id FROM users WHERE email=?", (email,)):
+        raise HTTPException(409, "This email is already registered. Please sign in.")
+
     uid = str(uuid.uuid4())
     exe(
         "INSERT INTO users VALUES(?,?,?,?,?,?)",
-        (uid, e, b.full_name.strip(), hash_password(b.password), 0, now()),
+        (uid, email, b.full_name.strip(), hash_password(b.password), 0, now()),
     )
+
+    email_sent = False
+    try:
+        challenge_id = str(uuid.uuid4())
+        otp = new_otp()
+        created = utcnow()
+
+        subject, body = otp_email(otp, "Email Verification")
+        email_sent = send_email(email, subject, body)
+
+        if email_sent:
+            exe(
+                """
+                INSERT INTO otp_challenges
+                    (id,user_id,email,purpose,otp_hash,expires_at,attempts,used,created_at,
+                     reset_jti,reset_expires_at,reset_used)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    challenge_id,
+                    uid,
+                    email,
+                    "EMAIL_VERIFICATION",
+                    hash_otp(otp),
+                    iso(created + timedelta(minutes=OTP_EXPIRE_MINUTES)),
+                    0,
+                    0,
+                    iso(created),
+                    None,
+                    None,
+                    0,
+                ),
+            )
+    except Exception:
+        logger.exception("Registration OTP send failed")
+
     return {
-        "message": "Account created. Complete email verification before production use."
+        "message": "Account created. Verify the OTP sent to your email.",
+        "verification_required": True,
+        "email": email,
+        "email_sent": email_sent,
     }
 
 
@@ -151,6 +205,13 @@ def login(b: Login, request: Request):
     u = one("SELECT * FROM users WHERE email=?", (b.email.lower(),))
     if not u or not verify_password(b.password, u["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
+
+    if not bool(u.get("is_verified", 0)):
+        raise HTTPException(
+            403,
+            "Please verify your email before signing in.",
+        )
+
     access, _, _ = create_token(
         u["id"],
         "access",
@@ -158,11 +219,284 @@ def login(b: Login, request: Request):
     )
     return {
         "access_token": access,
+        "token_type": "bearer",
         "user": {
             "id": u["id"],
             "email": u["email"],
             "full_name": u["full_name"],
         },
+    }
+
+
+def _find_latest_otp(user_id: str, purpose: str):
+    return one(
+        """
+        SELECT * FROM otp_challenges
+        WHERE user_id=? AND purpose=? AND used=0
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (user_id, purpose),
+    )
+
+
+def _create_and_send_otp(
+    user_id: str,
+    email: str,
+    purpose: str,
+) -> bool:
+    now_dt = utcnow()
+    existing = _find_latest_otp(user_id, purpose)
+
+    if existing:
+        try:
+            age = (now_dt - parse_iso(existing["created_at"])).total_seconds()
+            if age < OTP_RESEND_SECONDS:
+                raise HTTPException(
+                    429,
+                    f"Please wait {max(1, int(OTP_RESEND_SECONDS - age))} seconds before requesting another OTP.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    otp = new_otp()
+    subject, body = otp_email(
+        otp,
+        "Email Verification" if purpose == "EMAIL_VERIFICATION" else "Password Reset",
+    )
+
+    if not send_email(email, subject, body):
+        raise HTTPException(
+            503,
+            "We could not send the OTP email. Check the email provider configuration.",
+        )
+
+    exe(
+        """
+        UPDATE otp_challenges
+        SET used=1
+        WHERE user_id=? AND purpose=? AND used=0
+        """,
+        (user_id, purpose),
+    )
+
+    exe(
+        """
+        INSERT INTO otp_challenges
+            (id,user_id,email,purpose,otp_hash,expires_at,attempts,used,created_at,
+             reset_jti,reset_expires_at,reset_used)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            str(uuid.uuid4()),
+            user_id,
+            email,
+            purpose,
+            hash_otp(otp),
+            iso(now_dt + timedelta(minutes=OTP_EXPIRE_MINUTES)),
+            0,
+            0,
+            iso(now_dt),
+            None,
+            None,
+            0,
+        ),
+    )
+    return True
+
+
+@app.post("/api/auth/verify-registration")
+def verify_registration(email: EmailStr, otp: str = Field(min_length=6, max_length=6)):
+    normalized = str(email).lower().strip()
+    user_row = one("SELECT * FROM users WHERE email=?", (normalized,))
+    if not user_row:
+        raise HTTPException(404, "Account not found.")
+
+    challenge = _find_latest_otp(user_row["id"], "EMAIL_VERIFICATION")
+    if not challenge:
+        raise HTTPException(400, "No active verification OTP. Request a new OTP.")
+
+    expires_at = parse_iso(challenge["expires_at"])
+    if utcnow() > expires_at:
+        exe("UPDATE otp_challenges SET used=1 WHERE id=?", (challenge["id"],))
+        raise HTTPException(400, "OTP expired. Request a new OTP.")
+
+    attempts = int(challenge.get("attempts") or 0)
+    if attempts >= OTP_MAX_ATTEMPTS:
+        exe("UPDATE otp_challenges SET used=1 WHERE id=?", (challenge["id"],))
+        raise HTTPException(429, "Too many incorrect OTP attempts. Request a new OTP.")
+
+    if hash_otp(otp) != challenge["otp_hash"]:
+        exe(
+            "UPDATE otp_challenges SET attempts=attempts+1 WHERE id=?",
+            (challenge["id"],),
+        )
+        raise HTTPException(400, "Invalid OTP.")
+
+    exe(
+        "UPDATE users SET is_verified=1 WHERE id=?",
+        (user_row["id"],),
+    )
+    exe(
+        "UPDATE otp_challenges SET used=1 WHERE id=?",
+        (challenge["id"],),
+    )
+
+    access, _, _ = create_token(
+        user_row["id"],
+        "access",
+        timedelta(minutes=settings.access_minutes),
+    )
+
+    return {
+        "message": "Email verified successfully.",
+        "access_token": access,
+        "token_type": "bearer",
+        "user": {
+            "id": user_row["id"],
+            "email": user_row["email"],
+            "full_name": user_row["full_name"],
+        },
+    }
+
+
+@app.post("/api/auth/resend-registration-otp")
+def resend_registration_otp(email: EmailStr, request: Request):
+    rate_limit(request, "registration_otp", 6)
+    normalized = str(email).lower().strip()
+    user_row = one("SELECT * FROM users WHERE email=?", (normalized,))
+    if not user_row:
+        raise HTTPException(404, "Account not found.")
+
+    if bool(user_row.get("is_verified", 0)):
+        return {"message": "Email is already verified.", "already_verified": True}
+
+    _create_and_send_otp(user_row["id"], normalized, "EMAIL_VERIFICATION")
+    return {
+        "message": "A new verification OTP has been sent.",
+        "email_sent": True,
+    }
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyResetRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+
+
+class ResetPasswordRequest(BaseModel):
+    reset_token: str = Field(min_length=20)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@app.post("/api/auth/forgot-password")
+def forgot_password(data: ForgotPasswordRequest, request: Request):
+    rate_limit(request, "forgot_password", 6)
+    normalized = str(data.email).lower().strip()
+    user_row = one("SELECT * FROM users WHERE email=?", (normalized,))
+
+    # Match a production-safe generic response: do not reveal whether the
+    # email exists.
+    if user_row:
+        _create_and_send_otp(user_row["id"], normalized, "PASSWORD_RESET")
+
+    return {
+        "message": "If an account exists for that email, a 6-digit OTP has been sent.",
+    }
+
+
+@app.post("/api/auth/verify-reset-otp")
+def verify_reset_otp(data: VerifyResetRequest):
+    normalized = str(data.email).lower().strip()
+    user_row = one("SELECT * FROM users WHERE email=?", (normalized,))
+    if not user_row:
+        raise HTTPException(400, "Invalid or expired OTP.")
+
+    challenge = _find_latest_otp(user_row["id"], "PASSWORD_RESET")
+    if not challenge:
+        raise HTTPException(400, "Invalid or expired OTP.")
+
+    if utcnow() > parse_iso(challenge["expires_at"]):
+        exe("UPDATE otp_challenges SET used=1 WHERE id=?", (challenge["id"],))
+        raise HTTPException(400, "OTP expired. Request a new OTP.")
+
+    attempts = int(challenge.get("attempts") or 0)
+    if attempts >= OTP_MAX_ATTEMPTS:
+        exe("UPDATE otp_challenges SET used=1 WHERE id=?", (challenge["id"],))
+        raise HTTPException(429, "Too many incorrect OTP attempts. Request a new OTP.")
+
+    if hash_otp(data.otp) != challenge["otp_hash"]:
+        exe(
+            "UPDATE otp_challenges SET attempts=attempts+1 WHERE id=?",
+            (challenge["id"],),
+        )
+        raise HTTPException(400, "Invalid OTP.")
+
+    reset_token, reset_jti, reset_exp = create_token(
+        user_row["id"],
+        "password_reset",
+        timedelta(minutes=10),
+    )
+
+    exe(
+        """
+        UPDATE otp_challenges
+        SET used=1, reset_jti=?, reset_expires_at=?, reset_used=0
+        WHERE id=?
+        """,
+        (
+            reset_jti,
+            iso(reset_exp),
+            challenge["id"],
+        ),
+    )
+
+    return {
+        "message": "OTP verified.",
+        "reset_token": reset_token,
+    }
+
+
+@app.post("/api/auth/reset-password")
+def reset_password(data: ResetPasswordRequest):
+    try:
+        payload = decode(data.reset_token, "password_reset")
+    except jwt.PyJWTError:
+        raise HTTPException(400, "Reset authorization is invalid or expired.")
+
+    challenge = one(
+        """
+        SELECT * FROM otp_challenges
+        WHERE user_id=? AND reset_jti=? AND reset_used=0
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (payload["sub"], payload.get("jti")),
+    )
+    if not challenge:
+        raise HTTPException(400, "Reset authorization is invalid or already used.")
+
+    if challenge.get("reset_expires_at") and utcnow() > parse_iso(
+        challenge["reset_expires_at"]
+    ):
+        raise HTTPException(400, "Reset authorization expired. Request a new OTP.")
+
+    exe(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (hash_password(data.new_password), payload["sub"]),
+    )
+    exe(
+        "UPDATE otp_challenges SET reset_used=1 WHERE id=?",
+        (challenge["id"],),
+    )
+
+    return {
+        "message": "Password reset successfully. Please sign in again.",
     }
 
 
