@@ -625,6 +625,8 @@ function Dashboard(){
     catch(e:any){setMsg(e.message)}
   }
 
+  useEffect(()=>{const requestedFile=queryParam("file");if(requestedFile)openFile(requestedFile)},[]);
+
   async function removeFile(){
     if(!selectedFile)return;
     try{await api.deleteFile(selectedFile.id);setSelectedFile(null);await load()}
