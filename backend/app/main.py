@@ -254,7 +254,11 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
             embedding = vectors[i] if i < len(vectors) else None
 
             exe(
-                "INSERT INTO chunks VALUES(?,?,?,?,?,?)",
+                """
+                INSERT INTO chunks
+                    (id, file_id, user_id, content, source_ref, metadata, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
                 (
                     chunk_id,
                     fid,
