@@ -93,6 +93,27 @@ CREATE TABLE IF NOT EXISTS upload_jobs(
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS chat_threads(
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    scope_type TEXT NOT NULL,
+    file_id TEXT,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages(
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    citations TEXT NOT NULL,
+    confidence REAL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 """
 
 
