@@ -7,7 +7,7 @@ from datetime import timedelta, timezone
 from pathlib import Path
 
 import jwt
-from fastapi import FastAPI, UploadFile, File, Depends, Header, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, UploadFile, File, Depends, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 
@@ -570,17 +570,185 @@ def me(u=Depends(user)):
     }
 
 
-@app.post("/api/files/upload")
-async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)):
-    rate_limit(request, "upload", 20)
+def _update_upload_job(job_id: str, **fields) -> None:
+    allowed = {"file_id", "status", "stage", "progress", "error", "result", "updated_at"}
+    clean = {k: v for k, v in fields.items() if k in allowed}
+    if not clean:
+        return
+    if "updated_at" not in clean:
+        clean["updated_at"] = now()
+    assignments = ", ".join(f"{key}=?" for key in clean)
+    params = tuple(clean.values()) + (job_id,)
+    exe(f"UPDATE upload_jobs SET {assignments} WHERE id=?", params)
+
+
+def _process_upload_job(
+    job_id: str,
+    user_id: str,
+    file_id: str,
+    safe_name: str,
+    mime_type: str,
+    uploaded_uri: str,
+) -> None:
     started_at = time.perf_counter()
-    extract_started = None
-    extract_ms = 0.0
-    embedding_ms = 0.0
+    dest: Path | None = None
+    try:
+        ext = Path(safe_name).suffix.lower()
+        _update_upload_job(
+            job_id,
+            status="processing",
+            stage="extracting",
+            progress=25,
+        )
+
+        with tempfile.TemporaryDirectory(prefix="deepsearch-job-") as tmp:
+            dest = Path(tmp) / f"{file_id}{ext}"
+            storage.download_file(uploaded_uri, dest)
+
+            extract_started = time.perf_counter()
+            text, refs, ocr, pages = extract(dest)
+            extract_ms = (time.perf_counter() - extract_started) * 1000
+
+            if not text.strip():
+                _update_upload_job(
+                    job_id,
+                    status="failed",
+                    stage="failed",
+                    progress=0,
+                    error="No extractable text was found in this file.",
+                )
+                exe(
+                    "UPDATE files SET status=?, ocr_used=?, page_count=?, chunk_count=? WHERE id=? AND user_id=?",
+                    ("failed", int(ocr), pages, 0, file_id, user_id),
+                )
+                return
+
+            _update_upload_job(job_id, stage="chunking", progress=45)
+
+            chunk_records = chunk_document(text, refs)
+            chunks = [record[0] for record in chunk_records]
+
+            if not chunks:
+                _update_upload_job(
+                    job_id,
+                    status="failed",
+                    stage="failed",
+                    progress=0,
+                    error="No extractable retrieval chunks were created.",
+                )
+                exe(
+                    "UPDATE files SET status=?, ocr_used=?, page_count=?, chunk_count=? WHERE id=? AND user_id=?",
+                    ("failed", int(ocr), pages, 0, file_id, user_id),
+                )
+                return
+
+            _update_upload_job(job_id, stage="indexing", progress=60)
+
+            embedding_started = time.perf_counter()
+            vectors: list[list[float]] = []
+            try:
+                vectors = embed_texts(chunks)
+            except Exception as exc:
+                logger.warning("Embedding generation failed for %s: %s", safe_name, exc)
+            embedding_ms = (time.perf_counter() - embedding_started) * 1000
+
+            embedding_pairs: list[tuple[str, list[float]]] = []
+            for i, chunk in enumerate(chunks):
+                chunk_id = str(uuid.uuid4())
+                _, source_ref, chunk_meta = chunk_records[i]
+                embedding = vectors[i] if i < len(vectors) else None
+                metadata = {
+                    **chunk_meta,
+                    "guardrails": ["document_is_untrusted_data_only"],
+                    "retrieval": "faiss_semantic_plus_bm25",
+                    "embedding_model": settings.embedding_model_repo if embedding else None,
+                }
+                exe(
+                    """
+                    INSERT INTO chunks
+                        (id, file_id, user_id, content, source_ref, metadata, embedding)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chunk_id,
+                        file_id,
+                        user_id,
+                        chunk,
+                        source_ref,
+                        jd(metadata),
+                        jd(embedding) if embedding else None,
+                    ),
+                )
+                if embedding:
+                    embedding_pairs.append((chunk_id, embedding))
+
+            exe(
+                "UPDATE files SET status=?, ocr_used=?, page_count=?, chunk_count=? WHERE id=? AND user_id=?",
+                ("indexed", int(ocr), pages, len(chunks), file_id, user_id),
+            )
+
+            if embedding_pairs:
+                add_embeddings(user_id, embedding_pairs)
+            bump_search_version(user_id)
+
+            result = {
+                "file_id": file_id,
+                "name": safe_name,
+                "status": "indexed",
+                "chunks": len(chunks),
+                "embedding_chunks": len(embedding_pairs),
+                "storage": storage.backend,
+                "performance": {
+                    "processing_ms": round((time.perf_counter() - started_at) * 1000, 1),
+                    "extraction_ms": round(extract_ms, 1),
+                    "embedding_ms": round(embedding_ms, 1),
+                    "ocr_used": bool(ocr),
+                },
+            }
+            _update_upload_job(
+                job_id,
+                status="complete",
+                stage="ready",
+                progress=100,
+                result=jd(result),
+            )
+            logger.info(
+                "Upload job complete job=%s file=%s chunks=%s vectors=%s",
+                job_id,
+                safe_name,
+                len(chunks),
+                len(embedding_pairs),
+            )
+
+    except Exception as exc:
+        logger.exception("Upload job failed job=%s file=%s", job_id, safe_name)
+        try:
+            exe(
+                "UPDATE files SET status=? WHERE id=? AND user_id=?",
+                ("failed", file_id, user_id),
+            )
+        except Exception:
+            logger.exception("Could not mark failed upload file")
+        _update_upload_job(
+            job_id,
+            status="failed",
+            stage="failed",
+            progress=0,
+            error=str(exc)[:500],
+        )
+
+
+@app.post("/api/files/upload")
+async def upload(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    u=Depends(user),
+):
+    rate_limit(request, "upload", 20)
 
     uploaded_uri = ""
     dest: Path | None = None
-
     try:
         safe_name = validate_upload(file.filename or "", 1)
         raw = await file.read(MAX_UPLOAD_BYTES + 1)
@@ -594,136 +762,75 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
 
         ext = Path(safe_name).suffix.lower()
         fid = str(uuid.uuid4())
+        job_id = str(uuid.uuid4())
+        mime_type = file.content_type or "application/octet-stream"
 
-        # Local file is temporary ingestion workspace only.
         dest = Path(settings.upload_dir) / f"{fid}{ext}"
         dest.write_bytes(raw)
 
         inspect_zip_container(dest)
 
-        # Persist the original file before extraction. S3-compatible storage is
-        # production storage; local storage is only a development fallback.
         storage_key = f"{u['id']}/{fid}/{safe_name}"
         uploaded_uri = storage.upload_file(
             dest,
             storage_key,
-            file.content_type or "application/octet-stream",
+            mime_type,
         )
 
-        extract_started = time.perf_counter()
-        text, refs, ocr, pages = extract(dest)
-        extract_ms = (time.perf_counter() - extract_started) * 1000
-
-        # Retrieval-sized chunks preserve page/sheet provenance and keep
-        # numbered question banks as individual retrievable items.
-        chunk_records = chunk_document(text, refs)
-        chunks = [record[0] for record in chunk_records]
-
-        if not chunks:
-            storage.delete(uploaded_uri)
-            uploaded_uri = ""
-            raise GuardrailViolation(
-                "no_extractable_content",
-                "No extractable text was found in this file.",
-            )
-
-        # Embeddings use the same all-MiniLM-L6-v2 model family as Retail Mind.
-        # If model download/inference is temporarily unavailable, retain the
-        # document for lexical search rather than rejecting the upload.
-        vectors: list[list[float]] = []
-        embedding_started = time.perf_counter()
-        try:
-            vectors = embed_texts(chunks)
-        except Exception as exc:
-            logger.warning(
-                "Embedding generation failed for %s: %s",
-                safe_name,
-                exc,
-            )
-        finally:
-            embedding_ms = (time.perf_counter() - embedding_started) * 1000
-
-        embedding_pairs: list[tuple[str, list[float]]] = []
-
-        for i, chunk in enumerate(chunks):
-            chunk_id = str(uuid.uuid4())
-            _, source_ref, chunk_meta = chunk_records[i]
-            metadata = {
-                **chunk_meta,
-                "guardrails": ["document_is_untrusted_data_only"],
-                "retrieval": "faiss_semantic_plus_bm25",
-                "embedding_model": (
-                    settings.embedding_model_repo if vectors else None
-                ),
-            }
-            embedding = vectors[i] if i < len(vectors) else None
-
-            exe(
-                """
-                INSERT INTO chunks
-                    (id, file_id, user_id, content, source_ref, metadata, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    chunk_id,
-                    fid,
-                    u["id"],
-                    chunk,
-                    source_ref,
-                    jd(metadata),
-                    jd(embedding) if embedding else None,
-                ),
-            )
-
-            if embedding:
-                embedding_pairs.append((chunk_id, embedding))
-
+        created_at = now()
         exe(
             "INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?)",
             (
                 fid,
                 u["id"],
                 safe_name,
-                file.content_type or "application/octet-stream",
+                mime_type,
                 uploaded_uri,
-                "indexed",
-                int(ocr),
-                pages,
-                len(chunks),
-                now(),
+                "processing",
+                0,
+                0,
+                0,
+                created_at,
+            ),
+        )
+        exe(
+            """
+            INSERT INTO upload_jobs
+                (id,user_id,file_id,name,status,stage,progress,error,result,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                job_id,
+                u["id"],
+                fid,
+                safe_name,
+                "queued",
+                "uploaded",
+                10,
+                None,
+                None,
+                created_at,
+                created_at,
             ),
         )
 
-        if embedding_pairs:
-            add_embeddings(u["id"], embedding_pairs)
-
-        # Invalidate shared search-cache entries by advancing the per-user
-        # corpus version. Cached queries from the old corpus are then ignored.
-        bump_search_version(u["id"])
+        background_tasks.add_task(
+            _process_upload_job,
+            job_id,
+            u["id"],
+            fid,
+            safe_name,
+            mime_type,
+            uploaded_uri,
+        )
 
         return {
+            "job_id": job_id,
             "file_id": fid,
             "name": safe_name,
-            "status": "indexed",
-            "chunks": len(chunks),
-            "embedding_chunks": len(embedding_pairs),
-            "storage": storage.backend,
-            "performance": {
-                "processing_ms": round((time.perf_counter() - started_at) * 1000, 1),
-                "extraction_ms": round(extract_ms, 1),
-                "embedding_ms": round(embedding_ms, 1),
-                "ocr_used": bool(ocr),
-            },
-            "guardrails": {
-                "size_limit_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
-                "archive_bomb_check": ext in {
-                    ".docx",
-                    ".xlsx",
-                    ".xlsm",
-                    ".pptx",
-                },
-                "content_treated_as_untrusted_data": True,
-            },
+            "status": "processing",
+            "stage": "uploaded",
+            "progress": 10,
         }
 
     except GuardrailViolation as exc:
@@ -734,25 +841,36 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
     except Exception as exc:
         if uploaded_uri:
             storage.delete(uploaded_uri)
-        try:
-            exe(
-                "DELETE FROM chunks WHERE file_id=? AND user_id=?",
-                (fid, u["id"]),
-            )
-            exe(
-                "DELETE FROM files WHERE id=? AND user_id=?",
-                (fid, u["id"]),
-            )
-        except Exception:
-            logger.exception("Could not clean up failed indexing records")
-        logger.exception("Upload/indexing failed")
-        raise HTTPException(
-            500,
-            "The file could not be indexed right now.",
-        ) from exc
+        logger.exception("Upload request failed")
+        raise HTTPException(500, "The file could not be uploaded right now.") from exc
     finally:
         if dest is not None:
             dest.unlink(missing_ok=True)
+
+
+@app.get("/api/files/upload-jobs/{job_id}")
+def upload_job_status(job_id: str, u=Depends(user)):
+    row = one(
+        "SELECT id,file_id,name,status,stage,progress,error,result,created_at,updated_at "
+        "FROM upload_jobs WHERE id=? AND user_id=?",
+        (job_id, u["id"]),
+    )
+    if not row:
+        raise HTTPException(404, "Upload job not found")
+
+    result = jl(row.get("result") or "{}", {})
+    return {
+        "job_id": row["id"],
+        "file_id": row["file_id"],
+        "name": row["name"],
+        "status": row["status"],
+        "stage": row["stage"],
+        "progress": int(row.get("progress") or 0),
+        "error": row.get("error"),
+        "result": result,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
 
 
 @app.get("/api/files")
