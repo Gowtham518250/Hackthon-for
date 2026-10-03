@@ -1049,3 +1049,5 @@
 
 .ingest-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:12px}.ingest-metrics>div{padding:9px 10px;border:1px solid #182943;border-radius:11px;background:#080f1c}.ingest-metrics span,.ingest-metrics b{display:block}.ingest-metrics span{color:#60718e;font-size:7px;letter-spacing:.1em}.ingest-metrics b{color:#aebcff;font-size:10px;margin-top:4px}
 @media(max-width:700px){.ingest-metrics{grid-template-columns:1fr 1fr}}
+
+.reindex-file{width:100%;display:flex;justify-content:center;align-items:center;gap:7px;margin-top:16px;padding:10px;border:1px solid #2c3f69;border-radius:10px;background:#0c1528;color:#9eb2e7;font-size:10px;cursor:pointer}.reindex-file:hover{border-color:#5871b8;background:#0f1b34}.reindex-file:disabled{opacity:.6;cursor:wait}.spin{animation:reindexSpin 1s linear infinite}@keyframes reindexSpin{to{transform:rotate(360deg)}}
