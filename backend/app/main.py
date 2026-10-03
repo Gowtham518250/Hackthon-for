@@ -48,12 +48,27 @@ logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="DeepSearch API", version="1.3.0")
 
+# Render can expose the static site under the primary hostname while an
+# environment variable may still contain an older/custom origin. Keep the
+# configured origin, the current production hostname, local development, and
+# other Render HTTPS hosts explicitly allowed so browser fetches never fail
+# before reaching FastAPI.
+_ALLOWED_ORIGINS = {
+    settings.frontend_origin.rstrip("/"),
+    "https://hackthon-for.onrender.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+}
+_ALLOWED_ORIGIN_REGEX = r"https://[a-z0-9-]+(?:-[a-z0-9-]+)*\.onrender\.com"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
-    allow_credentials=True,
+    allow_origins=sorted(origin for origin in _ALLOWED_ORIGINS if origin),
+    allow_origin_regex=_ALLOWED_ORIGIN_REGEX,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
@@ -151,7 +166,11 @@ def health():
     return {
         "status": "ok",
         "service": "deepsearch",
-        "version": "1.3.0",
+        "version": "1.3.1",
+        "cors": {
+            "configured_frontend_origin": settings.frontend_origin,
+            "production_origin": "https://hackthon-for.onrender.com",
+        },
         "database": "postgresql" if is_postgres() else "sqlite",
         "storage": storage.backend,
         "embeddings": embedding_status(),
