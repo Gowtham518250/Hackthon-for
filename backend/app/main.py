@@ -1,6 +1,7 @@
 import uuid
 import logging
 import time
+import tempfile
 from collections import defaultdict, deque
 from datetime import timedelta, timezone
 from pathlib import Path
@@ -825,6 +826,125 @@ def file_chunks(file_id: str, limit: int = 50, u=Depends(user)):
     for row in rows:
         row["metadata"] = jl(row["metadata"], {})
     return {"file_id": file_id, "chunks": rows}
+
+
+@app.post("/api/files/{file_id}/reindex")
+def reindex_file(file_id: str, u=Depends(user)):
+    row = one(
+        "SELECT id,name,mime_type,path FROM files WHERE id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+    if not row:
+        raise HTTPException(404, "File not found")
+
+    started_at = time.perf_counter()
+    temp_path = None
+    try:
+        suffix = Path(row["name"]).suffix.lower()
+        with tempfile.TemporaryDirectory(prefix="deepsearch-reindex-") as tmp:
+            temp_path = Path(tmp) / f"{file_id}{suffix}"
+            storage.download_file(row["path"], temp_path)
+
+            extract_started = time.perf_counter()
+            text, refs, ocr, pages = extract(temp_path)
+            extract_ms = (time.perf_counter() - extract_started) * 1000
+
+            chunk_records = chunk_document(text, refs)
+            chunks = [record[0] for record in chunk_records]
+            if not chunks:
+                raise GuardrailViolation(
+                    "no_extractable_content",
+                    "No extractable text was found while re-indexing this file.",
+                )
+
+            embedding_started = time.perf_counter()
+            vectors: list[list[float]] = []
+            try:
+                vectors = embed_texts(chunks)
+            except Exception as exc:
+                logger.warning("Embedding generation failed during reindex for %s: %s", row["name"], exc)
+            embedding_ms = (time.perf_counter() - embedding_started) * 1000
+
+            exe(
+                "DELETE FROM chunks WHERE file_id=? AND user_id=?",
+                (file_id, u["id"]),
+            )
+
+            embedding_pairs: list[tuple[str, list[float]]] = []
+            for i, chunk in enumerate(chunks):
+                chunk_id = str(uuid.uuid4())
+                _, source_ref, chunk_meta = chunk_records[i]
+                embedding = vectors[i] if i < len(vectors) else None
+                metadata = {
+                    **chunk_meta,
+                    "guardrails": ["document_is_untrusted_data_only"],
+                    "retrieval": "faiss_semantic_plus_bm25",
+                    "embedding_model": settings.embedding_model_repo if embedding else None,
+                }
+                exe(
+                    """
+                    INSERT INTO chunks
+                        (id, file_id, user_id, content, source_ref, metadata, embedding)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chunk_id,
+                        file_id,
+                        u["id"],
+                        chunk,
+                        source_ref,
+                        jd(metadata),
+                        jd(embedding) if embedding else None,
+                    ),
+                )
+                if embedding:
+                    embedding_pairs.append((chunk_id, embedding))
+
+            exe(
+                "UPDATE files SET status=?, ocr_used=?, page_count=?, chunk_count=? WHERE id=? AND user_id=?",
+                ("indexed", int(ocr), pages, len(chunks), file_id, u["id"]),
+            )
+
+            from .vector_index import rebuild_user_index
+            rebuild_user_index(u["id"])
+            bump_search_version(u["id"])
+
+            return {
+                "file_id": file_id,
+                "name": row["name"],
+                "status": "reindexed",
+                "chunks": len(chunks),
+                "embedding_chunks": len(embedding_pairs),
+                "performance": {
+                    "processing_ms": round((time.perf_counter() - started_at) * 1000, 1),
+                    "extraction_ms": round(extract_ms, 1),
+                    "embedding_ms": round(embedding_ms, 1),
+                    "ocr_used": bool(ocr),
+                },
+            }
+    except GuardrailViolation as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        logger.exception("Re-index failed for %s", file_id)
+        raise HTTPException(500, "The file could not be re-indexed right now.") from exc
+
+
+@app.post("/api/files/reindex-all")
+def reindex_all_files(u=Depends(user)):
+    rows = all_(
+        "SELECT id FROM files WHERE user_id=? ORDER BY created_at DESC",
+        (u["id"],),
+    )
+    results = []
+    for item in rows:
+        try:
+            # Call the same endpoint logic through a direct helper-compatible request model
+            # is intentionally avoided; each file is processed through the internal function below.
+            result = _reindex_file_for_user(item["id"], u["id"])
+            results.append(result)
+        except Exception as exc:
+            results.append({"file_id": item["id"], "status": "failed", "error": str(exc)})
+    return {"results": results, "count": len(results)}
 
 
 @app.delete("/api/files/{file_id}")
