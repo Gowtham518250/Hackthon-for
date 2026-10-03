@@ -56,5 +56,7 @@ export const api={
   answer:(query:string)=>req("/api/ai/answer",{method:"POST",body:JSON.stringify({query,limit:12})}),
   evaluationBenchmark:()=>req("/api/evaluation/benchmark?limit=6"),
   evaluationSnapshot:(query:string,limit=5)=>req("/api/evaluation/snapshot",{method:"POST",body:JSON.stringify({query,limit})}),
-  evaluationCompare:(before:any,query:string,limit=5)=>req("/api/evaluation/compare",{method:"POST",body:JSON.stringify({before,query,limit})})
+  evaluationCompare:(before:any,query:string,limit=5)=>req("/api/evaluation/compare",{method:"POST",body:JSON.stringify({before,query,limit})}),
+  history:()=>req("/api/history?limit=100"),
+  deleteHistory:(id:string)=>req("/api/history/"+id,{method:"DELETE"})
 };
