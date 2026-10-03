@@ -29,6 +29,18 @@ services:
         sync: false
       - key: GROQ_MODEL
         value: qwen/qwen3.8-27b
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_URL
+        value: https://api.brevo.com/v3/smtp/email
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        value: DeepSearch
+      - key: EMAIL_HTTP_TIMEOUT_SECONDS
+        value: "10"
       - key: STORAGE_BACKEND
         value: local
       - key: LOCAL_STORAGE_DIR
@@ -37,7 +49,5 @@ services:
         value: /tmp/deepsearch
       - key: EMBEDDING_MODEL_REPO
         value: Xenova/all-MiniLM-L6-v2
-      - key: HF_HOME
-        value: /tmp/.cache/huggingface
       - key: DEBUG
         value: "false"
