@@ -45,6 +45,13 @@ CREATE TABLE IF NOT EXISTS files(
     content_hash TEXT
 );
 
+CREATE TABLE IF NOT EXISTS file_blobs(
+    object_key TEXT PRIMARY KEY,
+    content BYTEA NOT NULL,
+    content_type TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS chunks(
     id TEXT PRIMARY KEY,
     file_id TEXT NOT NULL,
