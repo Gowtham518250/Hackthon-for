@@ -13,7 +13,7 @@ from .config import settings
 from .db import init_db, one, all_, exe, jd, jl, now, is_postgres
 from .security import hash_password, verify_password, create_token, decode
 from .ingest import extract
-from .search import search
+from .search import search, bump_search_version
 from .ai_service import answer_with_guardrails
 from .storage import storage
 from .embeddings import embed_texts
@@ -287,6 +287,10 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
 
         if embedding_pairs:
             add_embeddings(u["id"], embedding_pairs)
+
+        # Invalidate shared search-cache entries by advancing the per-user
+        # corpus version. Cached queries from the old corpus are then ignored.
+        bump_search_version(u["id"])
 
         return {
             "file_id": fid,
