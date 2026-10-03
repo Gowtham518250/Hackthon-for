@@ -47,9 +47,20 @@ class Settings:
         "BREVO_API_URL",
         "https://api.brevo.com/v3/smtp/email",
     )
+    # Brevo variables (primary) with compatibility fallbacks matching Retail Mind.
     brevo_api_key: str = os.getenv("BREVO_API_KEY", "").strip()
-    brevo_sender_email: str = os.getenv("BREVO_SENDER_EMAIL", "").strip()
+    brevo_sender_email: str = (
+        os.getenv("BREVO_SENDER_EMAIL", "").strip()
+        or os.getenv("EMAIL_FROM", "").strip()
+        or os.getenv("SENDER_EMAIL", "").strip()
+    )
     brevo_sender_name: str = os.getenv("BREVO_SENDER_NAME", "DeepSearch").strip()
+    # SMTP fallback variables retained for compatibility with the Retail Mind setup.
+    smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com").strip()
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str = os.getenv("SMTP_USER", os.getenv("SENDER_EMAIL", "")).strip()
+    smtp_password: str = os.getenv("SMTP_PASSWORD", os.getenv("SENDER_PASSWORD", "")).strip()
+    email_from: str = os.getenv("EMAIL_FROM", os.getenv("SENDER_EMAIL", "")).strip()
     email_timeout_seconds: float = float(
         os.getenv("EMAIL_HTTP_TIMEOUT_SECONDS", "10")
     )
