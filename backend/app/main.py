@@ -88,6 +88,11 @@ class AIAnswerRequest(BaseModel):
     limit: int = Field(default=8, ge=1, le=12)
 
 
+class DeepSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=1000)
+    limit: int = Field(default=20, ge=1, le=20)
+
+
 async def user(authorization: str | None = Header(default=None)):
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "Authentication required")
@@ -321,6 +326,17 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
     except Exception as exc:
         if uploaded_uri:
             storage.delete(uploaded_uri)
+        try:
+            exe(
+                "DELETE FROM chunks WHERE file_id=? AND user_id=?",
+                (fid, u["id"]),
+            )
+            exe(
+                "DELETE FROM files WHERE id=? AND user_id=?",
+                (fid, u["id"]),
+            )
+        except Exception:
+            logger.exception("Could not clean up failed indexing records")
         logger.exception("Upload/indexing failed")
         raise HTTPException(
             500,
@@ -434,11 +450,11 @@ def delete_file(file_id: str, u=Depends(user)):
 
 
 @app.post("/api/deep-search")
-async def deep_search(b: AIAnswerRequest, request: Request, u=Depends(user)):
+async def deep_search(b: DeepSearchRequest, request: Request, u=Depends(user)):
     rate_limit(request, "deep_search", 20)
     query = guard_ai_query(b.query)
     results = search(u["id"], query, min(b.limit, 20))
-    answer = await answer_with_guardrails(query, results)
+    answer = await answer_with_guardrails(query, results[:12])
     return {
         "query": query,
         "results": results,
