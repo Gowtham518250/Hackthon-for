@@ -203,12 +203,12 @@ def validate_ai_citations(
     citations: Any,
     results: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    allowed = {
+    by_key = {
         (
             r.get("chunk_id"),
             r.get("file_id"),
             r.get("source_ref"),
-        )
+        ): r
         for r in results
     }
 
@@ -220,41 +220,47 @@ def validate_ai_citations(
         if not isinstance(citation, dict):
             continue
 
-        # Prefer exact chunk citation. Fall back to file+source for backward
-        # compatibility with earlier generated answers.
+        chunk_id = citation.get("chunk_id")
+        file_id = citation.get("file_id")
+        source_ref = citation.get("source_ref")
+
+        exact = by_key.get((chunk_id, file_id, source_ref))
+        if exact is None:
+            # Backward-compatible file/source citation.
+            exact = next(
+                (
+                    row
+                    for row in results
+                    if row.get("file_id") == file_id
+                    and row.get("source_ref") == source_ref
+                ),
+                None,
+            )
+
+        if exact is None:
+            continue
+
+        valid.append({
+            "chunk_id": exact.get("chunk_id"),
+            "file_id": exact.get("file_id"),
+            "file_name": exact.get("file_name"),
+            "source_ref": exact.get("source_ref"),
+        })
+
+    # Remove duplicates while preserving model ordering.
+    deduped = []
+    seen = set()
+    for citation in valid:
         key = (
             citation.get("chunk_id"),
             citation.get("file_id"),
             citation.get("source_ref"),
         )
+        if key not in seen:
+            seen.add(key)
+            deduped.append(citation)
 
-        if key in allowed:
-            valid.append({
-                "chunk_id": citation.get("chunk_id"),
-                "file_id": citation.get("file_id"),
-                "file_name": citation.get("file_name"),
-                "source_ref": citation.get("source_ref"),
-            })
-            continue
-
-        fallback_key = (
-            None,
-            citation.get("file_id"),
-            citation.get("source_ref"),
-        )
-        if any(
-            item[1] == fallback_key[1] and item[2] == fallback_key[2]
-            for item in allowed
-        ):
-            valid.append({
-                "chunk_id": citation.get("chunk_id"),
-                "file_id": citation.get("file_id"),
-                "file_name": citation.get("file_name"),
-                "source_ref": citation.get("source_ref"),
-            })
-
-    return valid
-
+    return deduped
 
 def grounded_fallback(query: str, results: list[dict[str, Any]]) -> dict[str, Any]:
     if not results:
