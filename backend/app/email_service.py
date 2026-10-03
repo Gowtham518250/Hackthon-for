@@ -17,9 +17,15 @@ def _brevo_enabled() -> bool:
 def send_email(recipient: str, subject: str, text: str) -> bool:
     """Retail Mind-compatible HTTPS transactional email using Brevo."""
     if not _brevo_enabled():
+        missing = []
+        if not settings.brevo_api_key:
+            missing.append("BREVO_API_KEY")
+        if not settings.brevo_sender_email:
+            missing.append("BREVO_SENDER_EMAIL/EMAIL_FROM/SENDER_EMAIL")
         logger.error(
-            "Email provider is not configured. Set EMAIL_PROVIDER=brevo, "
-            "BREVO_API_KEY and BREVO_SENDER_EMAIL."
+            "Email provider is not configured at runtime. provider=%s missing=%s",
+            settings.email_provider,
+            ",".join(missing),
         )
         return False
 
