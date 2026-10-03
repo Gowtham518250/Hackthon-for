@@ -77,7 +77,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://deepsearch-api.onrender.com
+        value: https://deep-search-ai-p8gi.onrender.com
 
 databases:
   - name: deepsearch-db
