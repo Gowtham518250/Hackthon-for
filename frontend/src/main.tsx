@@ -687,6 +687,7 @@ function Dashboard(){
       <nav className="dashboard-nav">
         <button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}><span>⌂</span>Home</button>
         <button onClick={scrollSearch}><Search size={15}/>Search</button>
+        <button onClick={()=>navigate("/chat")}><MessageCircle size={15}/>Chat</button>
         <button onClick={scrollFiles}><FileText size={15}/>My Files</button>
         <button onClick={()=>navigate("/history")}><RefreshCcw size={15}/>Recent</button>
         <button onClick={()=>navigate("/evaluation")}><Activity size={15}/>Evaluation</button>
