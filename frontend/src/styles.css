@@ -537,3 +537,111 @@
   .dark-section,.use-case-section,.pricing-section{padding-left:18px;padding-right:18px}
   .site-footer{padding:20px 18px;flex-wrap:wrap}
 }
+
+
+/* ===== Screenshot-matched DeepSearch hero polish ===== */
+.hero-section{
+  min-height:760px;
+  padding-top:54px;
+  padding-bottom:32px;
+}
+.hero-copy h1{
+  max-width:670px;
+  font-size:clamp(52px,5.25vw,86px);
+  line-height:.94;
+}
+.hero-copy>p{max-width:570px;font-size:13px}
+.hero-universe{
+  height:620px;
+  transform:translateY(-4px);
+}
+.hero-universe:after{
+  content:"";
+  position:absolute;
+  left:50%;bottom:-20px;
+  width:700px;height:130px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(ellipse,rgba(58,73,178,.34),rgba(30,45,108,.12) 48%,transparent 72%);
+  filter:blur(10px);
+  z-index:-1;
+}
+.hero-search-panel{
+  width:min(560px,84%);
+  padding:14px;
+  border-radius:25px;
+}
+.hero-search-top input{
+  flex:1;
+  width:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#dfe6fb;
+  font-size:12px;
+  min-width:0;
+}
+.hero-search-top input::placeholder{color:#71809f}
+.hero-search-top:focus-within{
+  border-color:#526bd0;
+  box-shadow:0 0 0 3px rgba(82,107,208,.1);
+}
+.hero-search-top button:hover{
+  transform:translateY(-1px) scale(1.03);
+}
+.hero-format-row{margin-top:10px}
+.hero-format-row span{
+  padding:7px 9px;
+  background:linear-gradient(180deg,#0d1530,#0a1125);
+}
+.hero-doc-card{
+  border-radius:15px;
+  min-width:155px;
+  box-shadow:0 22px 50px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.05);
+}
+.doc-red{left:0;top:15%}
+.doc-blue{right:0;top:10%}
+.doc-green{right:1%;bottom:26%}
+.doc-purple{left:2%;bottom:19%}
+.hero-answer-card{
+  right:6%;
+  bottom:2%;
+  width:270px;
+  border-color:#31457b;
+}
+.hero-answer-card:before{
+  content:"";
+  position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(120deg,transparent 34%,rgba(255,255,255,.05) 48%,transparent 62%);
+  transform:translateX(-100%);
+  animation:heroCardShine 6s ease-in-out infinite;
+}
+@keyframes heroCardShine{0%,55%{transform:translateX(-110%)}75%,100%{transform:translateX(110%)}}
+
+.flow-strip{
+  margin-top:-14px;
+  padding-bottom:62px;
+}
+.flow-card{
+  min-height:105px;
+  grid-template-columns:34px 44px 1fr 20px;
+  border-color:#1d2c4e;
+}
+.flow-card:hover .flow-arrow{transform:translateX(3px)}
+.flow-arrow{transition:transform .2s ease}
+
+@media(max-width:1100px){
+  .hero-section{min-height:auto}
+  .hero-universe{height:580px}
+}
+@media(max-width:800px){
+  .hero-universe{height:500px}
+  .hero-universe:after{width:520px}
+}
+@media(max-width:560px){
+  .hero-section{padding-top:30px}
+  .hero-universe{height:430px}
+  .hero-search-panel{width:96%}
+  .hero-answer-card{width:225px}
+  .flow-card{grid-template-columns:28px 36px 1fr 16px}
+}
