@@ -10,6 +10,7 @@ const routes = [
   "verify-reset",
   "reset-password",
   "dashboard",
+  "evaluation",
   "about",
 ];
 
