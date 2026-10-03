@@ -104,6 +104,25 @@ class DeepSearchRequest(BaseModel):
     limit: int = Field(default=20, ge=1, le=20)
 
 
+class VerifyRegistrationRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+
+
+class VerifyResetRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    reset_token: str = Field(min_length=20)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 async def user(authorization: str | None = Header(default=None)):
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "Authentication required")
@@ -308,8 +327,8 @@ def _create_and_send_otp(
 
 
 @app.post("/api/auth/verify-registration")
-def verify_registration(email: EmailStr, otp: str = Field(min_length=6, max_length=6)):
-    normalized = str(email).lower().strip()
+def verify_registration(data: VerifyRegistrationRequest):
+    normalized = str(data.email).lower().strip()
     user_row = one("SELECT * FROM users WHERE email=?", (normalized,))
     if not user_row:
         raise HTTPException(404, "Account not found.")
@@ -328,7 +347,7 @@ def verify_registration(email: EmailStr, otp: str = Field(min_length=6, max_leng
         exe("UPDATE otp_challenges SET used=1 WHERE id=?", (challenge["id"],))
         raise HTTPException(429, "Too many incorrect OTP attempts. Request a new OTP.")
 
-    if hash_otp(otp) != challenge["otp_hash"]:
+    if hash_otp(data.otp) != challenge["otp_hash"]:
         exe(
             "UPDATE otp_challenges SET attempts=attempts+1 WHERE id=?",
             (challenge["id"],),
@@ -378,20 +397,6 @@ def resend_registration_otp(email: EmailStr, request: Request):
         "message": "A new verification OTP has been sent.",
         "email_sent": True,
     }
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-
-class VerifyResetRequest(BaseModel):
-    email: EmailStr
-    otp: str = Field(min_length=6, max_length=6)
-
-
-class ResetPasswordRequest(BaseModel):
-    reset_token: str = Field(min_length=20)
-    new_password: str = Field(min_length=8, max_length=128)
 
 
 @app.post("/api/auth/forgot-password")
