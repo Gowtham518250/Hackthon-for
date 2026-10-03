@@ -1010,6 +1010,7 @@ function UploadFlowPage(){
   const[progress,setProgress]=useState(0);
   const[done,setDone]=useState<any>(null);
   const[error,setError]=useState('');
+  const[reconnecting,setReconnecting]=useState(false);
   const[job,setJob]=useState<any>(null);
   const file=pendingUploadFile;
   const startedRef=React.useRef(false);
@@ -1041,9 +1042,30 @@ function UploadFlowPage(){
         setProgress(10);
 
         let finished=false;
+        let transientFailures=0;
         while(alive&&!finished){
           await sleep(900);
-          const current=await api.uploadJob(accepted.job_id);
+
+          let current:any;
+          try{
+            current=await api.uploadJob(accepted.job_id);
+            transientFailures=0;
+            setReconnecting(false);
+          }catch(pollError:any){
+            transientFailures+=1;
+
+            // A Render process restart can briefly interrupt polling even
+            // though the persistent ingestion job is still alive. Keep the
+            // UI in a reconnecting state instead of falsely marking the file
+            // as failed.
+            if(transientFailures<=40){
+              setReconnecting(true);
+              await sleep(1500);
+              continue;
+            }
+            throw pollError;
+          }
+
           if(!alive)break;
           setJob(current);
           setProgress(Number(current.progress)||0);
@@ -1058,17 +1080,20 @@ function UploadFlowPage(){
 
           if(current.status==='complete'){
             finished=true;
+            setReconnecting(false);
             setStep(4);
             setProgress(100);
             setDone(current.result);
             pendingUploadFile=null;
           }else if(current.status==='failed'){
             finished=true;
+            setReconnecting(false);
             setError(current.error||'The file could not be indexed.');
           }
         }
       }catch(e:any){
         if(!alive)return;
+        setReconnecting(false);
         setError(e.message||'Upload failed. Please retry the upload.');
       }
     })();
@@ -1134,7 +1159,17 @@ function UploadFlowPage(){
         </div>
       </section>
 
-      {job&&!done&&!error&&
+      {reconnecting&&
+        <div className='ingest-live-status'>
+          <Activity size={16}/>
+          <div>
+            <b>Reconnecting to DeepSearch…</b>
+            <span>The ingestion job is safe. Waiting for the backend to come back online.</span>
+          </div>
+        </div>
+      }
+
+      {job&&!done&&!error&&!reconnecting&&
         <div className='ingest-live-status'>
           <Activity size={16}/>
           <div>
