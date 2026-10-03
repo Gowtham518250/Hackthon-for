@@ -1,12 +1,51 @@
+import hashlib
+import json
 import math
 import re
 from collections import Counter
 
+from .config import settings
 from .db import all_, jl
 from .vector_index import semantic_search
 from .embeddings import embed_query
 
+try:
+    import redis
+except ImportError:  # pragma: no cover
+    redis = None
+
 TOKEN_RE = re.compile(r"\b\w+\b")
+_CACHE_TTL_SECONDS = 60
+_redis = None
+
+
+def _cache_client():
+    global _redis
+    if _redis is not None:
+        return _redis
+    if not settings.redis_url or redis is None:
+        return None
+    try:
+        _redis = redis.from_url(settings.redis_url, decode_responses=True)
+        _redis.ping()
+        return _redis
+    except Exception:
+        _redis = None
+        return None
+
+
+def _cache_key(user_id, query, limit):
+    version = "0"
+    client = _cache_client()
+    if client:
+        try:
+            version = client.get(f"deepsearch:search:version:{user_id}") or "0"
+        except Exception:
+            pass
+    digest = hashlib.sha256(
+        f"{user_id}|{version}|{limit}|{query.strip().lower()}".encode("utf-8")
+    ).hexdigest()
+    return f"deepsearch:search:{digest}"
 
 
 def toks(s):
@@ -38,6 +77,17 @@ def _minmax(scores: dict[str, float]) -> dict[str, float]:
 
 
 def search(user_id, query, limit=20):
+    client = _cache_client()
+    key = _cache_key(user_id, query, limit)
+
+    if client:
+        try:
+            cached = client.get(key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+
     rows = all_(
         "SELECT c.*, f.name FROM chunks c "
         "JOIN files f ON f.id=c.file_id WHERE c.user_id=?",
@@ -68,7 +118,6 @@ def search(user_id, query, limit=20):
         ):
             semantic_scores[item["chunk_id"]] = item["score"]
     except Exception:
-        # Semantic indexing failure must not take down ordinary search.
         semantic_scores = {}
 
     candidate_ids = set(lexical_positive)
@@ -87,8 +136,6 @@ def search(user_id, query, limit=20):
         if key in candidate_ids
     }
 
-    # Hybrid retrieval: semantic meaning gets slightly more weight while
-    # lexical relevance protects exact names, IDs, dates and numbers.
     ranked = []
     by_id = {row["id"]: row for row in rows}
     for chunk_id in candidate_ids:
@@ -104,9 +151,9 @@ def search(user_id, query, limit=20):
 
     ranked.sort(key=lambda item: item[0], reverse=True)
 
-    return [
+    results = [
         {
-            "score": round(min(0.99, max(0.0, s)), 3),
+            "score": round(min(0.99, max(0.0, score)), 3),
             "file_id": row["file_id"],
             "file_name": row["name"],
             "chunk_id": row["id"],
@@ -115,5 +162,13 @@ def search(user_id, query, limit=20):
             "metadata": jl(row["metadata"], {}),
             "retrieval": "hybrid_semantic_bm25",
         }
-        for s, row in ranked[:limit]
+        for score, row in ranked[:limit]
     ]
+
+    if client:
+        try:
+            client.setex(key, _CACHE_TTL_SECONDS, json.dumps(results))
+        except Exception:
+            pass
+
+    return results
