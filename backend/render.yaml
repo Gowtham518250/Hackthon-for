@@ -3,15 +3,10 @@ services:
     name: deepsearch-api
     runtime: python
     region: singapore
-    plan: 1c-2g
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    disk:
-      name: deepsearch-data
-      mountPath: /var/data
-      sizeGB: 10
     envVars:
       - key: DATABASE_URL
         sync: false
