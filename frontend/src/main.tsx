@@ -79,7 +79,7 @@ function scrollToSection(id:string){
 
 function HeroUniverse(){
   return <div className="hero-universe">
-    <div className="hero-canvas">
+    <div className="landing-3d-canvas">
       <Canvas camera={{position:[0,0,7.8],fov:42}} dpr={[1,1.5]}>
         <ambientLight intensity={.6}/>
         <pointLight position={[3,4,6]} intensity={18} color="#8291ff"/>
