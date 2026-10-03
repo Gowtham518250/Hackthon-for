@@ -46,8 +46,6 @@ function DeepSearchVisual({large=false}:{large?:boolean}){
       <ScanText size={15}/><div><b>OCR extracted</b><small>image → searchable text</small></div>
     </motion.div>
 
-    <div className="ds-sweep sweep-one"/>
-    <div className="ds-sweep sweep-two"/>
   </div>;
 }
 
