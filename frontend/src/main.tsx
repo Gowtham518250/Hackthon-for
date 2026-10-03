@@ -700,6 +700,7 @@ function Dashboard(){
         </div>
       </section>
     </main>
+    </div>
 
     <AnimatePresence>{selectedFile&&<motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setSelectedFile(null)}><motion.aside className="evidence-drawer" initial={{x:70}} animate={{x:0}} exit={{x:70}} onClick={e=>e.stopPropagation()}><div className="drawer-head"><div><div className="eyebrow">SOURCE INSPECTOR</div><h3>{selectedFile.name}</h3></div><button className="icon-button" onClick={()=>setSelectedFile(null)}><X size={17}/></button></div><div className="drawer-meta"><span>{selectedFile.status}</span><span>{selectedFile.chunk_count} chunks</span><span>{selectedFile.ocr_used?"OCR":"Text extracted"}</span></div><div className="source-list">{selectedChunks.map((c:any,i:number)=><div className="source-block" key={c.id}><div className="source-label"><span>{String(i+1).padStart(2,"0")}</span><b>{c.source_ref}</b></div><p>{c.content}</p></div>)}</div><button className="delete-file" onClick={removeFile}><Trash2 size={15}/> Delete file</button></motion.aside></motion.div>}</AnimatePresence>
   </div>;
