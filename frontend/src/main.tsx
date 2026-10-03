@@ -321,6 +321,7 @@ function JudgeProofSection(){
         <a href="#home" onClick={(e)=>{e.preventDefault();scrollToSection("home")}}>Home</a>
         <a href="#capabilities" onClick={(e)=>{e.preventDefault();scrollToSection("capabilities")}}>Features</a>
         <a href="#how-it-works" onClick={(e)=>{e.preventDefault();scrollToSection("how-it-works")}}>How it works</a>
+        <a href="#architecture" onClick={(e)=>{e.preventDefault();scrollToSection("architecture")}}>Architecture</a>
         <a href="#use-cases" onClick={(e)=>{e.preventDefault();scrollToSection("use-cases")}}>Use Cases</a>
         <a href="#pricing" onClick={(e)=>{e.preventDefault();scrollToSection("pricing")}}>Pricing</a>
       </nav>
