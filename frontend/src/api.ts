@@ -58,6 +58,8 @@ export const api={
   evaluationBenchmark:()=>req("/api/evaluation/benchmark?limit=6"),
   evaluationSnapshot:(query:string,limit=5)=>req("/api/evaluation/snapshot",{method:"POST",body:JSON.stringify({query,limit})}),
   evaluationCompare:(before:any,query:string,limit=5)=>req("/api/evaluation/compare",{method:"POST",body:JSON.stringify({before,query,limit})}),
+  chats:(fileId?:string)=>req("/api/chats"+(fileId?"?file_id="+encodeURIComponent(fileId):"")),
+  chatMessage:(message:string,threadId?:string,fileId?:string)=>req("/api/chats/message",{method:"POST",body:JSON.stringify({message,thread_id:threadId||null,file_id:fileId||null})}),
   history:()=>req("/api/history?limit=100"),
   deleteHistory:(id:string)=>req("/api/history/"+id,{method:"DELETE"})
 };
