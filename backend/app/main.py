@@ -97,6 +97,12 @@ class Query(BaseModel):
     limit: int = Field(default=20, ge=1, le=50)
 
 
+class ChatMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=2000)
+    thread_id: str | None = None
+    file_id: str | None = None
+
+
 class AIAnswerRequest(BaseModel):
     query: str = Field(min_length=1, max_length=1000)
     limit: int = Field(default=8, ge=1, le=12)
@@ -1111,6 +1117,202 @@ async def deep_search(b: DeepSearchRequest, request: Request, u=Depends(user)):
             "generation": "groq",
             "grounding": True,
             "citations": True,
+        },
+    }
+
+
+def _chat_scope(file_id: str | None, user_id: str) -> tuple[str, str | None, str]:
+    if file_id:
+        file_row = one(
+            "SELECT id,name FROM files WHERE id=? AND user_id=?",
+            (file_id, user_id),
+        )
+        if not file_row:
+            raise HTTPException(404, "File not found")
+        return "file", file_row["id"], file_row["name"]
+    return "common", None, "All files"
+
+
+@app.get("/api/chats")
+def list_chats(file_id: str | None = None, u=Depends(user)):
+    scope_type, scoped_file_id, scope_title = _chat_scope(file_id, u["id"])
+    thread = one(
+        """
+        SELECT id,title,scope_type,file_id,created_at,updated_at
+        FROM chat_threads
+        WHERE user_id=? AND scope_type=? AND
+              ((file_id=? ) OR (file_id IS NULL AND ? IS NULL))
+        ORDER BY updated_at DESC
+        LIMIT 1
+        """,
+        (u["id"], scope_type, scoped_file_id, scoped_file_id),
+    )
+    if not thread:
+        thread_id = str(uuid.uuid4())
+        created = now()
+        title = scope_title if scope_type == "file" else "All files"
+        exe(
+            """
+            INSERT INTO chat_threads
+                (id,user_id,scope_type,file_id,title,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?)
+            """,
+            (
+                thread_id,
+                u["id"],
+                scope_type,
+                scoped_file_id,
+                title,
+                created,
+                created,
+            ),
+        )
+        thread = {
+            "id": thread_id,
+            "title": title,
+            "scope_type": scope_type,
+            "file_id": scoped_file_id,
+            "created_at": created,
+            "updated_at": created,
+        }
+
+    messages = all_(
+        """
+        SELECT id,role,content,citations,confidence,created_at
+        FROM chat_messages
+        WHERE thread_id=? AND user_id=?
+        ORDER BY created_at ASC
+        """,
+        (thread["id"], u["id"]),
+    )
+    for item in messages:
+        item["citations"] = jl(item.get("citations") or "[]", [])
+
+    return {
+        "thread": thread,
+        "scope": {
+            "type": scope_type,
+            "file_id": scoped_file_id,
+            "title": scope_title,
+        },
+        "messages": messages,
+    }
+
+
+@app.post("/api/chats/message")
+async def chat_message(data: ChatMessageRequest, request: Request, u=Depends(user)):
+    rate_limit(request, "chat", 20)
+    query = guard_ai_query(data.message)
+    scope_type, scoped_file_id, scope_title = _chat_scope(data.file_id, u["id"])
+
+    thread = None
+    if data.thread_id:
+        thread = one(
+            """
+            SELECT * FROM chat_threads
+            WHERE id=? AND user_id=? AND scope_type=?
+              AND ((file_id=? ) OR (file_id IS NULL AND ? IS NULL))
+            """,
+            (
+                data.thread_id,
+                u["id"],
+                scope_type,
+                scoped_file_id,
+                scoped_file_id,
+            ),
+        )
+        if not thread:
+            raise HTTPException(404, "Chat thread not found")
+
+    if not thread:
+        created = now()
+        thread_id = str(uuid.uuid4())
+        exe(
+            """
+            INSERT INTO chat_threads
+                (id,user_id,scope_type,file_id,title,created_at,updated_at)
+            VALUES(?,?,?,?,?,?,?)
+            """,
+            (
+                thread_id,
+                u["id"],
+                scope_type,
+                scoped_file_id,
+                scope_title,
+                created,
+                created,
+            ),
+        )
+        thread = {
+            "id": thread_id,
+            "title": scope_title,
+            "scope_type": scope_type,
+            "file_id": scoped_file_id,
+            "created_at": created,
+            "updated_at": created,
+        }
+
+    exe(
+        """
+        INSERT INTO chat_messages
+            (id,thread_id,user_id,role,content,citations,confidence,created_at)
+        VALUES(?,?,?,?,?,?,?,?)
+        """,
+        (
+            str(uuid.uuid4()),
+            thread["id"],
+            u["id"],
+            "user",
+            query,
+            "[]",
+            0,
+            now(),
+        ),
+    )
+
+    results = search(
+        u["id"],
+        query,
+        20,
+        file_ids=[scoped_file_id] if scoped_file_id else None,
+    )
+    answer = await answer_with_guardrails(query, results[:12])
+
+    exe(
+        """
+        INSERT INTO chat_messages
+            (id,thread_id,user_id,role,content,citations,confidence,created_at)
+        VALUES(?,?,?,?,?,?,?,?)
+        """,
+        (
+            str(uuid.uuid4()),
+            thread["id"],
+            u["id"],
+            "assistant",
+            str(answer.get("answer") or ""),
+            jd(answer.get("citations") or []),
+            float(answer.get("confidence") or 0),
+            now(),
+        ),
+    )
+    exe(
+        "UPDATE chat_threads SET updated_at=? WHERE id=? AND user_id=?",
+        (now(), thread["id"], u["id"]),
+    )
+
+    return {
+        "thread": thread,
+        "message": {
+            "role": "assistant",
+            "content": answer.get("answer") or "",
+            "citations": answer.get("citations") or [],
+            "confidence": float(answer.get("confidence") or 0),
+        },
+        "results": results,
+        "scope": {
+            "type": scope_type,
+            "file_id": scoped_file_id,
+            "title": scope_title,
         },
     }
 
