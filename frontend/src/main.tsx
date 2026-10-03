@@ -616,6 +616,7 @@ function Dashboard(){
         <button onClick={scrollSearch}><Search size={15}/>Search</button>
         <button onClick={scrollFiles}><FileText size={15}/>My Files</button>
         <button onClick={()=>document.getElementById("recent-files")?.scrollIntoView({behavior:"smooth"})}><RefreshCcw size={15}/>Recent</button>
+        <button onClick={()=>navigate("/evaluation")}><Activity size={15}/>Evaluation</button>
         <button onClick={()=>setMsg("Sharing is available after corpus sharing is enabled for this workspace.")}><Mail size={15}/>Shared With Me</button>
         <button onClick={()=>setMsg("Favourites will appear here when you pin evidence.")}><ShieldCheck size={15}/>Favourites</button>
         <button onClick={()=>setMsg("Deleted files are removed permanently in the current demo.")}><Trash2 size={15}/>Trash</button>
@@ -707,8 +708,159 @@ function Dashboard(){
 }
 
 
+function EvaluationPage(){
+  const[bench,setBench]=useState<any>(null);
+  const[loading,setLoading]=useState(true);
+  const[scenarioQuery,setScenarioQuery]=useState("");
+  const[before,setBefore]=useState<any>(null);
+  const[comparison,setComparison]=useState<any>(null);
+  const[after,setAfter]=useState<any>(null);
+  const[scenarioLoading,setScenarioLoading]=useState(false);
+  const[uploading,setUploading]=useState(false);
+  const[msg,setMsg]=useState("");
+
+  async function loadBenchmark(){
+    setLoading(true);setMsg("");
+    try{
+      await api.me();
+      const d=await api.evaluationBenchmark();
+      setBench(d);
+      if(!scenarioQuery&&d.cases?.[0]?.query)setScenarioQuery(d.cases[0].query);
+    }catch(e:any){
+      if(String(e.message).toLowerCase().includes("authentication")){clearAuthToken();navigate("/login");return}
+      setMsg(e.message);
+    }finally{setLoading(false)}
+  }
+  useEffect(()=>{loadBenchmark()},[]);
+
+  async function captureBefore(){
+    if(!scenarioQuery.trim())return;
+    setScenarioLoading(true);setMsg("");setComparison(null);setAfter(null);
+    try{const d=await api.evaluationSnapshot(scenarioQuery,5);setBefore(d)}
+    catch(e:any){setMsg(e.message)}
+    finally{setScenarioLoading(false)}
+  }
+
+  async function captureAfter(){
+    if(!scenarioQuery.trim()||!before)return;
+    setScenarioLoading(true);setMsg("");
+    try{const d=await api.evaluationCompare(before,scenarioQuery,5);setAfter(d.after);setComparison(d.comparison)}
+    catch(e:any){setMsg(e.message)}
+    finally{setScenarioLoading(false)}
+  }
+
+  async function uploadScenario(e:React.ChangeEvent<HTMLInputElement>){
+    const file=e.target.files?.[0];if(!file)return;
+    setUploading(true);setMsg("Indexing "+file.name+" for the live adaptation scenario…");
+    try{
+      const d=await api.upload(file);
+      setMsg(d.name+" indexed. Now run “Capture after state” to demonstrate adaptation.");
+      await loadBenchmark();
+    }catch(err:any){setMsg("Indexing failed: "+err.message)}
+    finally{setUploading(false);e.target.value=""}
+  }
+
+  const hs=bench?.deepsearch?.summary;
+  const bs=bench?.baseline?.summary;
+  return <div className="evaluation-page">
+    <div className="evaluation-topbar">
+      <button className="evaluation-back" onClick={()=>navigate("/dashboard")}><ArrowRight size={14} style={{transform:"rotate(180deg)"}}/> Dashboard</button>
+      <div><div className="eyebrow">FINAL ROUND · WEB-PS-025</div><h1>Evaluation & Live Adaptation</h1><p>Prove measurable retrieval improvement, then demonstrate the corpus adapting when inputs change.</p></div>
+      <button className="evaluation-run" onClick={loadBenchmark} disabled={loading}><RefreshCcw size={15}/>{loading?"Running…":"Run benchmark"}</button>
+    </div>
+
+    {msg&&<div className="evaluation-message"><AlertTriangle size={15}/>{msg}</div>}
+
+    <section className="evaluation-hero">
+      <div className="evaluation-hero-copy">
+        <span className="evaluation-pill"><Activity size={13}/> ROUND 3 EVIDENCE</span>
+        <h2>From “it works” to <span>measured proof.</span></h2>
+        <p>Compare a simple keyword-only baseline with the full DeepSearch hybrid engine using the current corpus. Then change the corpus and show the ranking adapting live.</p>
+        <div className="evaluation-status-row">
+          <span><CircleCheck size={13}/> Semantic retrieval</span>
+          <span><CircleCheck size={13}/> Lexical baseline</span>
+          <span><CircleCheck size={13}/> MRR / NDCG / P@5 / R@5</span>
+          <span><CircleCheck size={13}/> Before / after</span>
+        </div>
+      </div>
+      <div className="evaluation-visual">
+        <div className="evaluation-visual-core"><Layers3 size={30}/><b>HYBRID</b><small>semantic + lexical + rerank</small></div>
+        <span className="eval-orb e1"/><span className="eval-orb e2"/><span className="eval-orb e3"/><span className="eval-line l1"/><span className="eval-line l2"/>
+      </div>
+    </section>
+
+    {bench?.status==="needs_corpus" ? <section className="evaluation-empty"><Database size={28}/><b>Upload a representative corpus first.</b><span>The benchmark and live adaptation scenario run against the files indexed in your private workspace.</span><label className="evaluation-upload">{uploading?"Indexing…":"Upload first benchmark file"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={uploadScenario}/></label></section> : <>
+      <section className="evaluation-metrics">
+        <div className="evaluation-section-head"><div><span className="eyebrow">BASELINE COMPARISON</span><h3>Keyword search vs DeepSearch</h3><p>The baseline uses lexical matching only. DeepSearch adds embeddings, exact signals, structured metadata and reranking.</p></div><span className="evaluation-scope">Corpus-local benchmark · {hs?.cases||0} cases</span></div>
+        <div className="comparison-table">
+          <div className="comparison-head"><span>Metric</span><b>Keyword baseline</b><b>DeepSearch hybrid</b><span>Delta</span></div>
+          {[
+            ["Precision@5",bs?.precision_at_5,hs?.precision_at_5,"%"],
+            ["Recall@5",bs?.recall_at_5,hs?.recall_at_5,"%"],
+            ["MRR",bs?.mrr,hs?.mrr,""],
+            ["NDCG@5",bs?.ndcg_at_5,hs?.ndcg_at_5,""]
+          ].map(row=>{
+            const delta=typeof row[1]==="number"&&typeof row[2]==="number"?row[2]-row[1]:0;
+            return <div className="comparison-row" key={String(row[0])}><span>{row[0]}</span><b>{row[1]??"—"}{row[3]}</b><b className="hybrid-value">{row[2]??"—"}{row[3]}</b><strong className={delta>=0?"delta-positive":"delta-negative"}>{delta>=0?"+":""}{typeof delta==="number"?delta.toFixed(row[3]==="%"?1:3):"—"}{row[3]==="%"?" pts":""}</strong></div>
+          })}
+          <div className="comparison-row latency"><span>Avg retrieval latency</span><b>{bs?.avg_latency_ms??"—"} ms</b><b className="hybrid-value">{hs?.avg_latency_ms??"—"} ms</b><strong>{hs&&bs?((hs.avg_latency_ms-bs.avg_latency_ms).toFixed(1)):"—"} ms</strong></div>
+        </div>
+      </section>
+
+      <section className="evaluation-cases">
+        <div className="evaluation-section-head"><div><span className="eyebrow">REPRODUCIBLE JUDGE SCENARIOS</span><h3>Representative benchmark cases</h3><p>Each case uses a real chunk from your indexed corpus as the relevance target.</p></div></div>
+        <div className="evaluation-case-grid">
+          {(bench?.cases||[]).map((c:any)=>(
+            <button className="evaluation-case" key={c.id} onClick={()=>setScenarioQuery(c.query)}>
+              <div className="evaluation-case-top"><span>{c.id}</span><small>{c.file_name} · {c.source_ref}</small></div>
+              <b>{c.query}</b>
+              <div className="evaluation-case-metrics"><span>P@5 <strong>{c.hybrid.precision_at_5}%</strong></span><span>MRR <strong>{c.hybrid.mrr}</strong></span><span>Base MRR <strong>{c.baseline.mrr}</strong></span></div>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="evaluation-live">
+        <div className="evaluation-section-head"><div><span className="eyebrow">LIVE ADAPTATION · ROUND 2</span><h3>Change the corpus and show DeepSearch adapting</h3><p>Capture the current state, add a meaningful file, then capture again. The system compares corpus size, ranking and evidence changes.</p></div></div>
+        <div className="live-query-bar">
+          <Search size={17}/><input value={scenarioQuery} onChange={e=>setScenarioQuery(e.target.value)} placeholder="Choose or enter a judge scenario query…"/>
+          <button onClick={captureBefore} disabled={scenarioLoading||!scenarioQuery.trim()}>{scenarioLoading?"Working…":"1 · Capture before"}</button>
+        </div>
+        <div className="live-actions">
+          <label className="evaluation-upload action">{uploading?<Activity size={15}/>:<Upload size={15}/>} {uploading?"Indexing…":"2 · Upload changed input"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={uploadScenario} disabled={uploading}/></label>
+          <button className="evaluation-secondary" onClick={captureAfter} disabled={scenarioLoading||!before}><Activity size={15}/>3 · Capture after</button>
+        </div>
+
+        {before&&<div className="snapshot-grid">
+          <div className="snapshot-card"><span>BEFORE</span><b>{before.corpus.files} files</b><small>{before.corpus.chunks} chunks · top result {before.hybrid?.[0]?.file_name||"—"}</small></div>
+          {after?<div className="snapshot-card after"><span>AFTER</span><b>{after.corpus.files} files</b><small>{after.corpus.chunks} chunks · top result {after.hybrid?.[0]?.file_name||"—"}</small></div>:<div className="snapshot-placeholder">Upload a changed input, then capture the after state.</div>}
+        </div>}
+
+        {comparison&&<div className="adaptation-result">
+          <div className="adaptation-banner"><CircleCheck size={16}/><div><b>{comparison.corpus_changed?"Corpus changed and ranking was re-evaluated":"No corpus change detected"}</b><span>File delta {comparison.file_delta>=0?"+":""}{comparison.file_delta} · Chunk delta {comparison.chunk_delta>=0?"+":""}{comparison.chunk_delta}</span></div></div>
+          <div className="adaptation-grid">
+            <div><span>TOP RESULT BEFORE</span><b>{comparison.top_result_before?.file_name||"—"}</b><small>{comparison.top_result_before?.source_ref||""}</small></div>
+            <div><ArrowRight size={18}/></div>
+            <div><span>TOP RESULT AFTER</span><b>{comparison.top_result_after?.file_name||"—"}</b><small>{comparison.top_result_after?.source_ref||""}</small></div>
+            <div><span>SCORE DELTA</span><b>{comparison.score_delta>=0?"+":""}{comparison.score_delta}</b><small>hybrid relevance score</small></div>
+          </div>
+          <div className="adaptation-tags">
+            {(comparison.new_result_files||[]).length?<span><CircleCheck size={12}/>New file entered top evidence set</span>:<span><CircleCheck size={12}/>Evidence set remained stable</span>}
+            {(comparison.new_result_chunks||[]).length?<span><CircleCheck size={12}/>{comparison.new_result_chunks.length} new evidence chunks surfaced</span>:null}
+          </div>
+        </div>}
+
+        {(before||after)&&<div className="before-after-results">
+          <div><span>BEFORE · TOP EVIDENCE</span>{(before?.hybrid||[]).slice(0,3).map((r:any,i:number)=><article key={r.chunk_id}><b>{i+1}. {r.file_name}</b><small>{r.source_ref} · {Math.round((r.score||0)*100)}%</small></article>)}</div>
+          <div><span>AFTER · TOP EVIDENCE</span>{(after?.hybrid||[]).slice(0,3).map((r:any,i:number)=><article key={r.chunk_id}><b>{i+1}. {r.file_name}</b><small>{r.source_ref} · {Math.round((r.score||0)*100)}%</small></article>)}</div>
+        </div>}
+      </section>
+    </>}
+  </div>;
+}
+
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
-function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(path==="/dashboard"&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
-  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/check-email")return <CheckEmailPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password")return <ForgotPasswordPage/>;if(path==="/verify-reset")return <VerifyResetPage/>;if(path==="/reset-password")return <ResetPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;return <HomePage/>}
+function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(["/dashboard","/evaluation"].includes(path)&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
+  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/check-email")return <CheckEmailPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password")return <ForgotPasswordPage/>;if(path==="/verify-reset")return <VerifyResetPage/>;if(path==="/reset-password")return <ResetPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;if(path==="/evaluation")return <EvaluationPage/>;return <HomePage/>}
 createRoot(document.getElementById("root")!).render(<App/>);
