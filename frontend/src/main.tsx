@@ -715,6 +715,7 @@ function EvaluationPage(){
   const[before,setBefore]=useState<any>(null);
   const[comparison,setComparison]=useState<any>(null);
   const[after,setAfter]=useState<any>(null);
+  const[lastIngest,setLastIngest]=useState<any>(null);
   const[scenarioLoading,setScenarioLoading]=useState(false);
   const[uploading,setUploading]=useState(false);
   const[msg,setMsg]=useState("");
@@ -754,7 +755,8 @@ function EvaluationPage(){
     setUploading(true);setMsg("Indexing "+file.name+" for the live adaptation scenario…");
     try{
       const d=await api.upload(file);
-      setMsg(d.name+" indexed. Now run “Capture after state” to demonstrate adaptation.");
+      setLastIngest(d.performance||null);
+      setMsg(d.name+" indexed. Now capture the after state to demonstrate adaptation.");
       await loadBenchmark();
     }catch(err:any){setMsg("Indexing failed: "+err.message)}
     finally{setUploading(false);e.target.value=""}
@@ -826,6 +828,13 @@ function EvaluationPage(){
           <Search size={17}/><input value={scenarioQuery} onChange={e=>setScenarioQuery(e.target.value)} placeholder="Choose or enter a judge scenario query…"/>
           <button onClick={captureBefore} disabled={scenarioLoading||!scenarioQuery.trim()}>{scenarioLoading?"Working…":"1 · Capture before"}</button>
         </div>
+        {lastIngest&&<div className="ingest-metrics">
+          <div><span>INDEXING</span><b>{lastIngest.processing_ms} ms</b></div>
+          <div><span>EXTRACTION</span><b>{lastIngest.extraction_ms} ms</b></div>
+          <div><span>EMBEDDINGS</span><b>{lastIngest.embedding_ms} ms</b></div>
+          <div><span>OCR</span><b>{lastIngest.ocr_used?"USED":"NOT USED"}</b></div>
+        </div>}
+
         <div className="live-actions">
           <label className="evaluation-upload action">{uploading?<Activity size={15}/>:<Upload size={15}/>} {uploading?"Indexing…":"2 · Upload changed input"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={uploadScenario} disabled={uploading}/></label>
           <button className="evaluation-secondary" onClick={captureAfter} disabled={scenarioLoading||!before}><Activity size={15}/>3 · Capture after</button>
