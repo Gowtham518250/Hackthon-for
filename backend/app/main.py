@@ -977,7 +977,7 @@ async def upload(
             INSERT INTO files
                 (id,user_id,name,mime_type,path,status,ocr_used,page_count,
                  chunk_count,created_at,content_hash)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 fid,
