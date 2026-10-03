@@ -17,6 +17,8 @@ function navigate(path:string){window.history.pushState({},'',path);window.dispa
 function usePath(){const[path,setPath]=useState(window.location.pathname+window.location.search);useEffect(()=>{const f=()=>setPath(window.location.pathname+window.location.search);window.addEventListener("popstate",f);return()=>window.removeEventListener("popstate",f)},[]);return path}
 function queryParam(name:string){return new URLSearchParams(window.location.search).get(name)||""}
 
+let pendingUploadFile: File | null = null;
+
 function DeepSearchVisual({large=false}:{large?:boolean}){
   return <div className={large?"ds-visual large":"ds-visual"}>
     <div className="ds-glow glow-a"/>
