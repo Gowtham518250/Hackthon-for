@@ -920,6 +920,8 @@ async def upload(
 
     uploaded_uri = ""
     dest: Path | None = None
+    ext = ""
+    content_hash = ""
     try:
         safe_name = validate_upload(file.filename or "", 1)
         raw = await file.read(MAX_UPLOAD_BYTES + 1)
