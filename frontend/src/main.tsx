@@ -1160,9 +1160,13 @@ function ChatPage(){
     <aside className="chat-sidebar">
       <div className="chat-brand"><span className="brand-glyph">◆</span><b>DEEP<span>SEARCH</span></b></div>
       <button className="chat-side-new" onClick={()=>switchScope("")}><MessageCircle size={15}/>Common chat</button>
-      <div className="chat-side-label">FILE CHATS</div>
+      <div className="chat-side-label file-chat-heading"><span>FILE CHATS</span><b>{files.length}</b></div>
       <div className="chat-file-list">
-        {files.map(f=><button key={f.id} className={fileId===f.id?"active":""} onClick={()=>switchScope(f.id)}><FileText size={14}/><span>{f.name}</span></button>)}
+        {files.length?files.map(f=><button key={f.id} className={"chat-file-item "+(fileId===f.id?"active":"")} onClick={()=>switchScope(f.id)}>
+          <span className="chat-file-icon">{iconFor(f.mime_type||"")}</span>
+          <span className="chat-file-copy"><b>{f.name}</b><small>{f.chunk_count} chunks · {f.status}</small></span>
+          <ChevronRight size={13} className="chat-file-arrow"/>
+        </button>):<div className="chat-no-files"><FileSearch size={18}/><span>Upload files to start file chats.</span></div>}
       </div>
       <button className="chat-side-back" onClick={()=>navigate("/dashboard")}><ArrowRight size={14} style={{transform:"rotate(180deg)"}}/>Dashboard</button>
     </aside>
