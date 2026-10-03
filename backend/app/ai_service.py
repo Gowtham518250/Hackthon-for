@@ -108,7 +108,7 @@ def _is_summary_query(query: str) -> bool:
         r"\bwhat is (?:this|the|a|an) (?:file|document|pdf|sheet)\b",
         r"\bwhat.?s (?:this|the) (?:file|document|pdf|sheet)\b",
         r"\bwhat (?:does|do) (?:this|the) (?:file|document|pdf|sheet) (?:contain|cover|include)\b",
-        r"\bwhat (?:this|the) (?:file|document|pdf|sheet) contains\b",
+        r"\bwhat (?:this|the)?\s*(?:file|document|pdf|sheet) contains\b",
         r"\bsummar(?:ize|ise) (?:this|the|a|an) (?:file|document|pdf|sheet)\b",
         r"\b(?:give|show) (?:me )?(?:a )?(?:summary|overview)\b",
         r"\boverview of (?:this|the|a|an) (?:file|document|pdf|sheet)\b",
