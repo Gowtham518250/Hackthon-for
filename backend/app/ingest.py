@@ -9,7 +9,6 @@ from docx import Document
 
 try:
     from rapidocr import RapidOCR
-
     _OCR = RapidOCR()
 except Exception:
     _OCR = None
@@ -18,23 +17,17 @@ except Exception:
 def _ocr_image(image_bytes: bytes) -> str:
     if _OCR is None:
         return ""
-
     try:
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
         result = _OCR(np.asarray(image))
-
-        # RapidOCR returns an object with txts in current releases; support
-        # tuple/list-shaped outputs too for compatibility with older builds.
         if hasattr(result, "txts"):
             values = result.txts or ()
         elif isinstance(result, tuple) and result:
             values = getattr(result[0], "txts", None) or result[0]
         else:
             values = result or []
-
         if isinstance(values, str):
             return values.strip()
-
         return "\n".join(str(value) for value in values if value).strip()
     except Exception:
         return ""
@@ -50,25 +43,18 @@ def extract(path: Path):
     if ext == ".pdf":
         doc = fitz.open(path)
         pages = len(doc)
-
         for i, page in enumerate(doc):
             page_text = (page.get_text("text") or "").strip()
-
-            # OCR scanned pages when normal PDF text extraction is empty.
             if not page_text:
                 try:
-                    pix = page.get_pixmap(
-                        matrix=fitz.Matrix(1.5, 1.5),
-                        alpha=False,
-                    )
+                    pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
                     page_text = _ocr_image(pix.tobytes("png"))
                     if page_text:
                         ocr = True
                 except Exception:
                     page_text = ""
-
             if page_text:
-                text += f"\n{page_text}"
+                text += f"\n\n[[SOURCE:page {i + 1}]]\n{page_text}\n"
                 refs.append(f"page {i + 1}")
 
     elif ext == ".docx":
@@ -87,21 +73,19 @@ def extract(path: Path):
         frames = []
         for sheet_name, frame in sheets.items():
             if not frame.empty:
-                frames.append(
-                    f"Sheet: {sheet_name}\n" + frame.to_csv(index=True)
-                )
+                frames.append(f"\n\n[[SOURCE:sheet {sheet_name}]]\n" + frame.to_csv(index=True))
         text = "\n".join(frames)
-        refs = list(sheets.keys()) or ["table"]
+        refs = [f"sheet {name}" for name in sheets] or ["table"]
 
     elif ext == ".csv":
         frame = pd.read_csv(path)
-        text = frame.to_csv(index=True)
+        text = "\n\n[[SOURCE:table]]\n" + frame.to_csv(index=True)
         refs = ["table"]
 
     elif ext in {".jpg", ".jpeg", ".png"}:
         text = _ocr_image(path.read_bytes())
         ocr = bool(text)
-        refs = ["image"] if text else []
+        refs = ["image"]
 
     elif ext in {".txt", ".md"}:
         text = path.read_text(errors="ignore")
