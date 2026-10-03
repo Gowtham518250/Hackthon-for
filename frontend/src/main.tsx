@@ -77,6 +77,44 @@ function scrollToSection(id:string){
   document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+function DataGlobe(){
+  const points=useMemo(()=>{
+    const items=[];
+    const total=70;
+    for(let i=0;i<total;i++){
+      const phi=Math.acos(1-(2*(i+.5))/total);
+      const theta=Math.PI*(1+Math.sqrt(5))*i;
+      const r=1.58;
+      items.push([r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta)]);
+    }
+    return items;
+  },[]);
+  return <group rotation={[0.18,-0.45,0]}>
+    <mesh>
+      <sphereGeometry args={[1.58,48,48]}/>
+      <meshStandardMaterial color="#101b50" emissive="#1f2c98" emissiveIntensity={.8} metalness={.9} roughness={.28} wireframe transparent opacity={.6}/>
+    </mesh>
+    <mesh>
+      <sphereGeometry args={[1.49,32,32]}/>
+      <meshBasicMaterial color="#7180ff" wireframe transparent opacity={.06}/>
+    </mesh>
+    {points.map((p,i)=><Float key={i} speed={.7+(i%4)*.12} floatIntensity={.1}>
+      <mesh position={p as [number,number,number]}>
+        <sphereGeometry args={[i%7===0?.025:.014,8,8]}/>
+        <meshBasicMaterial color={i%9===0?"#c37cff":"#7087ff"}/>
+      </mesh>
+    </Float>)}
+    <mesh rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[1.69,.01,8,128]}/>
+      <meshBasicMaterial color="#667aff" transparent opacity={.35}/>
+    </mesh>
+    <mesh rotation={[0,Math.PI/3,0]}>
+      <torusGeometry args={[1.72,.008,8,128]}/>
+      <meshBasicMaterial color="#a06eff" transparent opacity={.22}/>
+    </mesh>
+  </group>;
+}
+
 function HeroUniverse(){
   return <div className="hero-universe">
     <div className="landing-3d-canvas">
@@ -87,25 +125,7 @@ function HeroUniverse(){
         <Stars radius={38} depth={20} count={900} factor={1.8} saturation={0} fade/>
         <ThreeSparkles count={130} scale={[12,7,8]} size={1.5} speed={.25} color="#9baaff"/>
 
-        <Float speed={.75} rotationIntensity={.05} floatIntensity={.18}>
-          <mesh rotation={[0.2,-0.45,0]}>
-            <sphereGeometry args={[1.55,32,32]}/>
-            <meshStandardMaterial
-              color="#111b4c"
-              emissive="#263aa0"
-              emissiveIntensity={.75}
-              metalness={.85}
-              roughness={.3}
-              wireframe
-              transparent
-              opacity={.72}
-            />
-          </mesh>
-          <mesh rotation={[0.2,-0.45,0]}>
-            <sphereGeometry args={[1.42,24,24]}/>
-            <meshBasicMaterial color="#556cff" wireframe transparent opacity={.08}/>
-          </mesh>
-        </Float>
+        <Float speed={.55} floatIntensity={.22}><DataGlobe/></Float>
 
         <Float speed={1.2} floatIntensity={.5}>
           <mesh position={[-1.9,1.2,.1]}>
@@ -122,11 +142,11 @@ function HeroUniverse(){
       </Canvas>
     </div>
 
-    <div className="hero-search-panel">
+    <form className="hero-search-panel" onSubmit={(e)=>{e.preventDefault();navigate("/register")}}>
       <div className="hero-search-top">
         <Search size={19}/>
-        <span>Search across your files...</span>
-        <button aria-label="Open DeepSearch" onClick={()=>navigate("/register")}><ArrowRight size={17}/></button>
+        <input aria-label="Search your files" placeholder="Search across your files..." />
+        <button aria-label="Start searching" type="submit"><ArrowRight size={17}/></button>
       </div>
       <div className="hero-format-row">
         <span><FileText size={13}/> PDF</span>
@@ -137,11 +157,11 @@ function HeroUniverse(){
       </div>
       <div className="hero-search-label">Try searching:</div>
       <div className="hero-query-row">
-        <button onClick={()=>navigate("/register")}>“customer payment delays”</button>
-        <button onClick={()=>navigate("/register")}>“project report summary”</button>
-        <button onClick={()=>navigate("/register")}>“revenue in Q3”</button>
+        <button type="button" onClick={()=>navigate("/register")}>“last month invoices”</button>
+        <button type="button" onClick={()=>navigate("/register")}>“project report summary”</button>
+        <button type="button" onClick={()=>navigate("/register")}>“revenue in Q3”</button>
       </div>
-    </div>
+    </form>
 
     <motion.div className="hero-doc-card doc-red" animate={{y:[0,-10,0],rotateZ:[-4,-1,-4]}} transition={{duration:5.5,repeat:Infinity,ease:"easeInOut"}}>
       <FileText size={16}/><div><b>Annual report.pdf</b><small>page 12 · 92% match</small></div>
@@ -176,11 +196,11 @@ function HomePage(){
         <span>DEEP</span>SEARCH
       </button>
       <nav className="desktop-nav">
-        <a href="#home">Home</a>
-        <a href="#capabilities">Features</a>
-        <a href="#how-it-works">How it works</a>
-        <a href="#use-cases">Use Cases</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#home" onClick={(e)=>{e.preventDefault();scrollToSection("home")}}>Home</a>
+        <a href="#capabilities" onClick={(e)=>{e.preventDefault();scrollToSection("capabilities")}}>Features</a>
+        <a href="#how-it-works" onClick={(e)=>{e.preventDefault();scrollToSection("how-it-works")}}>How it works</a>
+        <a href="#use-cases" onClick={(e)=>{e.preventDefault();scrollToSection("use-cases")}}>Use Cases</a>
+        <a href="#pricing" onClick={(e)=>{e.preventDefault();scrollToSection("pricing")}}>Pricing</a>
       </nav>
       <button className="nav-about" onClick={()=>scrollToSection("about")}>About DeepSearch <ArrowRight size={14}/></button>
     </header>
