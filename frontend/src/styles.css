@@ -1292,3 +1292,42 @@
 @media(max-width:600px){
   .hero-section{padding-left:18px;padding-right:18px}.hero-copy{padding-left:0}.hero-universe{height:520px;min-height:500px}.hero-telemetry{width:96%;top:2%}.hero-telemetry-stage{min-width:50px}.hero-telemetry-stage b{font-size:6px}.hero-telemetry-stage span{display:none}.hero-telemetry-arrow{display:none}.flow-strip{grid-template-columns:1fr;padding-left:18px;padding-right:18px}.dark-section,.use-case-section,.pricing-section,.about-mini-section{padding-left:18px;padding-right:18px}.about-mini-section{gap:25px}.site-footer{padding:20px 18px;flex-wrap:wrap;gap:12px}
 }
+
+
+/* ===== Dashboard typography: large-screen readability upgrade ===== */
+@media (min-width: 1001px){
+  .dashboard-sidebar{width:252px}
+  .dashboard-main{width:calc(100% - 252px);margin-left:252px;padding:30px 38px 90px}
+  .dashboard-brand{font-size:17px}
+  .sidebar-workspace{padding:17px 14px}
+  .sidebar-workspace small{font-size:9px}.sidebar-workspace b{font-size:13px}.sidebar-workspace span{font-size:10px}
+  .dashboard-nav button{font-size:13px;padding:11px 12px;gap:11px}
+  .sidebar-storage{padding:15px}.sidebar-storage small,.sidebar-storage span{font-size:9px}.sidebar-storage b{font-size:12px}
+  .sidebar-profile{padding:10px}.sidebar-profile b{font-size:10px}.sidebar-profile small{font-size:9px}
+  .dashboard-heading h1{font-size:34px}.dashboard-heading span{font-size:9px}.dashboard-header p{font-size:12px}
+  .dashboard-upload{font-size:11px;padding:11px 15px}
+  .dashboard-searchbar{padding:11px 12px 11px 14px}.dashboard-searchbar input{font-size:15px}.dashboard-searchbar input::placeholder{font-size:14px}.dashboard-searchbar button{font-size:11px;padding:11px 18px}
+  .dashboard-filter-row button{font-size:10px;padding:8px 11px}
+  .dashboard-message{font-size:11px;padding:12px 14px}
+  .file-type-grid{gap:12px}.file-type-grid>div{min-height:96px;padding:14px 16px}.file-type-grid b{font-size:24px}.file-type-grid span{font-size:10px}.file-type-icon{width:40px;height:40px}
+  .panel-heading{padding:15px 17px}.panel-heading b{font-size:13px}.panel-heading span{font-size:10px}.panel-heading button{font-size:10px}
+  .recent-file-row,.recent-search-row{padding:12px 15px;gap:10px}.recent-file-row b{font-size:11px}.recent-file-row small{font-size:9px}
+  .recent-search-row span{font-size:10px}.recent-search-row small{font-size:8px}
+  .quick-action{padding:15px;grid-template-columns:34px 1fr;column-gap:10px}.quick-action b{font-size:11px}.quick-action small{font-size:9px}
+  .overview-copy{padding:30px 22px}.overview-copy b{font-size:18px}.overview-copy p{font-size:10px}.overview-copy button{font-size:10px;padding:9px 11px}
+  .dashboard-results{padding:16px;min-height:500px}
+  .dashboard-result-card{grid-template-columns:40px 1fr;gap:12px;padding:14px}.result-rank{width:32px;height:32px;font-size:10px}.result-title b{font-size:11px}.result-title small{font-size:9px}.result-title strong{font-size:11px}.dashboard-result-card p{font-size:11px;line-height:1.75}.text-button{font-size:10px}
+  .dashboard-ai{padding:18px}.ai-panel-top h3{font-size:19px}.ai-empty b{font-size:13px}.ai-empty span{font-size:10px}.ai-answer-text{font-size:14px;line-height:1.8}.confidence-row{font-size:10px}.citation-card{padding:10px}.citation-card b{font-size:10px}.citation-card small{font-size:8px}
+  .drawer-head h3{font-size:25px}.drawer-meta span{font-size:10px}.source-label b{font-size:11px}.source-block p{font-size:11px;line-height:1.8}
+}
+@media (min-width: 1400px){
+  .dashboard-main{padding-left:44px;padding-right:44px}
+  .dashboard-heading h1{font-size:38px}
+  .dashboard-header p{font-size:13px}
+  .dashboard-searchbar input{font-size:16px}
+  .panel-heading b{font-size:14px}.panel-heading span{font-size:10px}
+  .recent-file-row b{font-size:12px}.recent-search-row span{font-size:11px}
+  .quick-action b{font-size:12px}.quick-action small{font-size:10px}
+  .dashboard-result-card p{font-size:12px}
+  .ai-answer-text{font-size:15px}
+}
