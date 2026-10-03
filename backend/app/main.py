@@ -1279,7 +1279,7 @@ async def chat_message(data: ChatMessageRequest, request: Request, u=Depends(use
     )
 
     if not results and scoped_file_id and re.search(
-        r"\b(what (?:is|does) (?:this|the) (?:file|document|pdf|sheet)|what.?s (?:this|the) (?:file|document|pdf|sheet)|summar(?:ize|ise)|overview)\b",
+        r"\b(what (?:is|does) (?:this|the)?\s*(?:file|document|pdf|sheet)|what.?s (?:this|the)?\s*(?:file|document|pdf|sheet)|what\s+(?:file|document|pdf|sheet)\s+contains|summar(?:ize|ise)|overview)\b",
         query,
         re.I,
     ):
