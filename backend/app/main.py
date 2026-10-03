@@ -697,6 +697,21 @@ def _process_upload_job(
             progress=25,
         )
 
+        # Make retries idempotent. A restarted worker may have left partial
+        # chunks behind; always rebuild the file's searchable state.
+        exe(
+            "DELETE FROM chunks WHERE file_id=? AND user_id=?",
+            (file_id, user_id),
+        )
+        exe(
+            """
+            UPDATE files
+            SET status=?, ocr_used=?, page_count=?, chunk_count=?
+            WHERE id=? AND user_id=?
+            """,
+            ("processing", 0, 0, 0, file_id, user_id),
+        )
+
         with tempfile.TemporaryDirectory(prefix="deepsearch-job-") as tmp:
             dest = Path(tmp) / f"{file_id}{ext}"
             storage.download_file(uploaded_uri, dest)
