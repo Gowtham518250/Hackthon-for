@@ -143,6 +143,12 @@ def _validate_answer_shape(
         if len(numbered) < min(requested, len(evidence)):
             return False
 
+    if _is_summary_query(query):
+        if re.search(r"(?m)^\s*\d+[.)]\s+", answer):
+            return False
+        if len(re.findall(r"[.!?]", answer)) < 1:
+            return False
+
     return True
 
 
