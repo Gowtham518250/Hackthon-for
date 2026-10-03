@@ -91,3 +91,44 @@
 
 @media(max-width:1050px){.about-hero{grid-template-columns:1fr}.about-orbit{position:absolute;right:-120px;top:10%;opacity:.6}.about-cards{grid-template-columns:1fr}.auth-layout{grid-template-columns:1fr;gap:10px;padding-top:14vh}.auth-visual{min-height:350px;padding-bottom:0}.auth-visual .orbit-visual{left:4%;top:-4%;transform:scale(.8)}.auth-panel{margin:auto}.public-nav nav button:not(.nav-cta){display:none}}
 @media(max-width:640px){.public-nav,.auth-nav{left:18px;right:18px}.about-hero{padding:16vh 20px 40px}.about-copy h1{font-size:48px}.about-copy>p{font-size:13px}.about-orbit{right:-200px;top:7%;transform:scale(.72)}.about-cards{padding:0 20px 35px}.auth-layout{padding:12vh 20px 30px}.auth-visual{min-height:260px}.auth-visual .orbit-visual{left:50%;transform:translateX(-50%) scale(.62);top:-40px}.auth-visual-copy{display:none}.auth-panel{max-width:none;padding:23px}.orbit-visual.large{min-width:350px;min-height:350px}}
+
+
+/* ===== Reference-inspired public experience ===== */
+.about-space,.auth-space{position:fixed;inset:0;z-index:0;background:#020309}
+.about-space canvas,.auth-space canvas{width:100%!important;height:100%!important;opacity:.62}
+.about-stars{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(circle at 50% 42%,rgba(82,99,255,.18),transparent 30%),linear-gradient(180deg,rgba(2,3,9,.25),rgba(2,3,9,.96) 86%)}
+.about-main{position:relative;z-index:3}
+.about-hero-new{min-height:calc(100vh - 40px);padding:112px 28px 30px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.about-kicker{color:#7182ae;font-size:10px;letter-spacing:.22em;font-weight:800}
+.about-hero-new h1{max-width:1150px;font:700 clamp(48px,7vw,104px)/.95 'Space Grotesk',sans-serif;letter-spacing:-.055em;margin:19px 0 20px}
+.about-hero-new h1 span{background:linear-gradient(100deg,#d9ddff 8%,#8295ff 52%,#c77eff 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.about-hero-new>p{max-width:680px;color:#8b98b3;font-size:14px;line-height:1.75;margin:0}
+.about-actions{display:flex;justify-content:center;gap:9px;margin-top:25px}
+.hero-orbit-stage{position:relative;width:min(760px,94vw);height:440px;margin-top:26px;display:grid;place-items:center}
+.hero-orbit-stage .orbit-visual{transform:scale(1.14)}
+.hero-chip{position:absolute;display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid #2b3b62;border-radius:12px;background:rgba(8,12,25,.74);backdrop-filter:blur(16px);box-shadow:0 18px 50px rgba(0,0,0,.25);text-align:left}
+.hero-chip svg{color:#8ea4ff}
+.hero-chip b,.hero-chip span{display:block;font-size:8px}.hero-chip b{color:#d8e0f4}.hero-chip span{color:#60708e;margin-top:2px}.chip-top{top:35px;left:50%;transform:translateX(-50%)}.chip-left{left:30px;top:46%;transform:translateY(-50%)}.chip-right{right:30px;top:46%;transform:translateY(-50%)}.chip-bottom{bottom:24px;left:50%;transform:translateX(-50%)}
+.capability-row{max-width:1120px;margin:0 auto;padding:0 20px 70px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.capability-row>div{min-height:120px;padding:18px;border:1px solid #192741;border-radius:18px;background:rgba(7,11,22,.72);backdrop-filter:blur(18px);text-align:left}
+.cap-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:#0e1731;border:1px solid #253760;color:#91a5ff;margin-bottom:18px}
+.capability-row b,.capability-row span{display:block}.capability-row b{font:600 14px 'Space Grotesk',sans-serif}.capability-row span{font-size:9px;color:#64728c;line-height:1.5;margin-top:5px}
+.how-section{max-width:1120px;margin:0 auto;padding:20px 20px 100px}
+.section-eyebrow{color:#64759a;font-size:9px;letter-spacing:.2em;font-weight:800}.how-section h2{font:700 39px 'Space Grotesk',sans-serif;letter-spacing:-.035em;margin:9px 0 7px}.how-section>p{color:#71809a;font-size:11px;margin:0}
+.loop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}.loop-grid>div{padding:20px;border-top:1px solid #25365a;background:linear-gradient(180deg,rgba(11,16,31,.85),rgba(6,9,18,.76));border-radius:14px}.loop-grid span{font-size:9px;color:#7b8dc0}.loop-grid h3{font:600 17px 'Space Grotesk',sans-serif;margin:10px 0 7px}.loop-grid p{color:#70809b;font-size:10px;line-height:1.65;margin:0}
+
+/* ===== Reference-inspired auth screens ===== */
+.auth-space canvas{opacity:.28}
+.auth-center-page{position:relative;z-index:3;min-height:100vh;display:grid;place-items:center;padding:85px 18px 28px}
+.auth-card{width:min(430px,100%);padding:27px 30px 25px;border:1px solid #24365d;border-radius:27px;background:rgba(4,7,15,.84);box-shadow:0 35px 110px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.035);backdrop-filter:blur(25px)}
+.auth-orb{height:125px;display:grid;place-items:center}.auth-orb .orbit-visual{transform:scale(.35)}
+.auth-copy{text-align:center}.auth-copy h2{font:700 27px 'Space Grotesk',sans-serif;letter-spacing:-.03em;margin:0 0 6px}.auth-copy p{color:#707e9c;font-size:10px;line-height:1.6;max-width:300px;margin:0 auto 19px}
+.auth-card .auth-title{font-size:25px}.auth-card .auth-subtitle{font-size:10px}.field-label-row{display:flex;justify-content:space-between;align-items:center}
+.inline-link{border:0;background:transparent;color:#91a5da;font-size:9px;padding:0}
+.auth-card .gradient-button{width:100%;margin-top:2px}
+.auth-card .alert{font-size:10px}
+.auth-card .switch-text{padding-top:4px}
+.auth-card .auth-form label{font-size:9px}
+.auth-card .auth-form input{padding:12px 13px;background:#050911;border-color:#273553}
+@media(max-width:800px){.about-hero-new{padding-top:95px}.hero-orbit-stage{height:380px}.hero-orbit-stage .orbit-visual{transform:scale(.9)}.capability-row,.loop-grid{grid-template-columns:1fr}.chip-left{left:0}.chip-right{right:0}}
+@media(max-width:560px){.public-nav nav button:not(.nav-cta),.back-link{display:none}.public-nav{top:18px;left:18px;right:18px}.about-hero-new{padding-left:18px;padding-right:18px}.about-hero-new h1{font-size:48px}.about-hero-new>p{font-size:12px}.hero-orbit-stage{height:330px}.hero-orbit-stage .orbit-visual{transform:scale(.7)}.hero-chip{padding:7px 8px}.chip-left{left:-8px}.chip-right{right:-8px}.chip-top{top:18px}.chip-bottom{bottom:5px}.auth-card{padding:22px 19px}.auth-orb{height:112px}}
