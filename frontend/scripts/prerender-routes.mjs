@@ -11,6 +11,9 @@ const routes = [
   "reset-password",
   "dashboard",
   "evaluation",
+  "history",
+  "workspace",
+  "ingest",
   "about",
 ];
 
