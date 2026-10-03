@@ -54,8 +54,6 @@ services:
         value: /tmp/deepsearch
       - key: EMBEDDING_MODEL_REPO
         value: Xenova/all-MiniLM-L6-v2
-      - key: HF_HOME
-        value: /tmp/.cache/huggingface
       - key: DEBUG
         value: "false"
 
