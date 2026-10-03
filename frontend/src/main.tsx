@@ -613,12 +613,11 @@ function Dashboard(){
     finally{setLoading(false)}
   }
 
-  async function upload(e:React.ChangeEvent<HTMLInputElement>){
+  function beginUpload(e:React.ChangeEvent<HTMLInputElement>){
     const file=e.target.files?.[0];if(!file)return;
-    setUploading(true);setMsg("Indexing "+file.name+"…");
-    try{const d=await api.upload(file);setMsg(d.name+" indexed · "+d.chunks+" chunks · "+d.embedding_chunks+" semantic vectors");await load()}
-    catch(err:any){setMsg("Indexing failed: "+err.message)}
-    finally{setUploading(false);e.target.value=""}
+    pendingUploadFile=file;
+    e.target.value="";
+    navigate("/ingest");
   }
 
   async function openFile(id:string){
@@ -658,11 +657,11 @@ function Dashboard(){
         <button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}><span>⌂</span>Home</button>
         <button onClick={scrollSearch}><Search size={15}/>Search</button>
         <button onClick={scrollFiles}><FileText size={15}/>My Files</button>
-        <button onClick={()=>document.getElementById("recent-files")?.scrollIntoView({behavior:"smooth"})}><RefreshCcw size={15}/>Recent</button>
+        <button onClick={()=>navigate("/history")}><RefreshCcw size={15}/>Recent</button>
         <button onClick={()=>navigate("/evaluation")}><Activity size={15}/>Evaluation</button>
-        <button onClick={()=>setMsg("Sharing is available after corpus sharing is enabled for this workspace.")}><Mail size={15}/>Shared With Me</button>
-        <button onClick={()=>setMsg("Favourites will appear here when you pin evidence.")}><ShieldCheck size={15}/>Favourites</button>
-        <button onClick={()=>setMsg("Deleted files are removed permanently in the current demo.")}><Trash2 size={15}/>Trash</button>
+        <button onClick={()=>navigate("/workspace?view=shared")}><Mail size={15}/>Shared With Me</button>
+        <button onClick={()=>navigate("/workspace?view=favourites")}><ShieldCheck size={15}/>Favourites</button>
+        <button onClick={()=>navigate("/workspace?view=trash")}><Trash2 size={15}/>Trash</button>
       </nav>
       <div className="sidebar-storage"><small>Corpus storage</small><b>{stats.files} files indexed</b><div className="storage-bar"><span style={{width:(Math.min(100,Math.max(4,(stats.chunks||0)/5)))+"%"}}/></div><span>{stats.chunks} retrieval chunks</span></div>
       <div className="sidebar-profile" onClick={()=>{clearAuthToken();navigate("/")}}><div className="profile-avatar">{(user?.full_name||"G").slice(0,1).toUpperCase()}</div><div><b>{user?.full_name||"User"}</b><small>{user?.email||""}</small></div><LogOut size={14}/></div>
@@ -671,7 +670,7 @@ function Dashboard(){
     <div className="dashboard-main">
       <header className="dashboard-header">
         <div><div className="dashboard-heading"><h1>DeepSearch</h1><span>PRIVATE FILE INTELLIGENCE</span></div><p>Search across PDFs, Word, Excel, CSV and images with evidence-first AI.</p></div>
-        <label className="dashboard-upload">{uploading?<Activity size={15}/>:<Upload size={15}/>} {uploading?"Indexing…":"Upload Files"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload} disabled={uploading}/></label>
+        <label className="dashboard-upload">{uploading?<Activity size={15}/>:<Upload size={15}/>} {uploading?"Indexing…":"Upload Files"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={beginUpload} disabled={uploading}/></label>
       </header>
 
       <section className="dashboard-search-hero">
@@ -707,7 +706,7 @@ function Dashboard(){
         <div className="panel-box">
           <div className="panel-heading"><div><b>Quick Actions</b><span>Jump straight into your workflow</span></div></div>
           <div className="quick-action-grid">
-            <label className="quick-action blue"><Upload size={18}/><b>Upload Files</b><small>Index documents</small><input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload}/></label>
+            <label className="quick-action blue"><Upload size={18}/><b>Upload Files</b><small>Index documents</small><input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={beginUpload}/></label>
             <button className="quick-action purple" onClick={scrollSearch}><Search size={18}/><b>New Search</b><small>Ask DeepSearch</small></button>
             <button className="quick-action green" onClick={scrollFiles}><FileText size={18}/><b>View Corpus</b><small>Browse indexed files</small></button>
             <button className="quick-action orange" onClick={()=>{setQuery("summarize my indexed files");deepSearch("summarize my indexed files")}}><BrainCircuit size={18}/><b>AI Summary</b><small>Grounded answer</small></button>
@@ -727,7 +726,7 @@ function Dashboard(){
         <div className="panel-box">
           <div className="panel-heading"><div><b>Recent Searches</b><span>Your latest questions</span></div><button onClick={scrollSearch}>New search →</button></div>
           <div className="recent-search-list">
-            {recentSearches.length?recentSearches.map((q:string,i:number)=><button key={q+i} onClick={()=>deepSearch(q)} className="recent-search-row"><RefreshCcw size={14}/><span>{q}</span><small>{i===0?"just now":(i+" ago")}</small><ArrowUpRight size={12}/></button>):<div className="dashboard-empty"><Search size={24}/><b>No searches yet</b><span>Your recent DeepSearch questions will appear here.</span></div>}
+            {recentSearches.length?recentSearches.map((q:string,i:number)=><button key={q+i} onClick={()=>navigate("/history")} className="recent-search-row"><RefreshCcw size={14}/><span>{q}</span><small>{i===0?"just now":(i+" ago")}</small><ArrowUpRight size={12}/></button>):<div className="dashboard-empty"><Search size={24}/><b>No searches yet</b><span>Your recent DeepSearch questions will appear here.</span></div>}
           </div>
         </div>
       </section>
