@@ -41,6 +41,19 @@ class Settings:
     )
     redis_url: str = os.getenv("REDIS_URL", "")
 
+    # Transactional email: same HTTPS Brevo configuration used by Retail Mind.
+    email_provider: str = os.getenv("EMAIL_PROVIDER", "brevo").strip().lower()
+    brevo_api_url: str = os.getenv(
+        "BREVO_API_URL",
+        "https://api.brevo.com/v3/smtp/email",
+    )
+    brevo_api_key: str = os.getenv("BREVO_API_KEY", "").strip()
+    brevo_sender_email: str = os.getenv("BREVO_SENDER_EMAIL", "").strip()
+    brevo_sender_name: str = os.getenv("BREVO_SENDER_NAME", "DeepSearch").strip()
+    email_timeout_seconds: float = float(
+        os.getenv("EMAIL_HTTP_TIMEOUT_SECONDS", "10")
+    )
+
     debug: bool = os.getenv("DEBUG", "true").lower() == "true"
 
 
