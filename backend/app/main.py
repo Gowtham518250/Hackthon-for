@@ -1,5 +1,6 @@
 import uuid
 import logging
+import time
 from collections import defaultdict, deque
 from datetime import timedelta, timezone
 from pathlib import Path
@@ -571,6 +572,10 @@ def me(u=Depends(user)):
 @app.post("/api/files/upload")
 async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)):
     rate_limit(request, "upload", 20)
+    started_at = time.perf_counter()
+    extract_started = None
+    extract_ms = 0.0
+    embedding_ms = 0.0
 
     uploaded_uri = ""
     dest: Path | None = None
@@ -604,7 +609,9 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
             file.content_type or "application/octet-stream",
         )
 
+        extract_started = time.perf_counter()
         text, refs, ocr, pages = extract(dest)
+        extract_ms = (time.perf_counter() - extract_started) * 1000
 
         # Retrieval-sized chunks preserve page/sheet provenance and keep
         # numbered question banks as individual retrievable items.
@@ -623,6 +630,7 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
         # If model download/inference is temporarily unavailable, retain the
         # document for lexical search rather than rejecting the upload.
         vectors: list[list[float]] = []
+        embedding_started = time.perf_counter()
         try:
             vectors = embed_texts(chunks)
         except Exception as exc:
@@ -631,6 +639,8 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
                 safe_name,
                 exc,
             )
+        finally:
+            embedding_ms = (time.perf_counter() - embedding_started) * 1000
 
         embedding_pairs: list[tuple[str, list[float]]] = []
 
@@ -697,6 +707,12 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
             "chunks": len(chunks),
             "embedding_chunks": len(embedding_pairs),
             "storage": storage.backend,
+            "performance": {
+                "processing_ms": round((time.perf_counter() - started_at) * 1000, 1),
+                "extraction_ms": round(extract_ms, 1),
+                "embedding_ms": round(embedding_ms, 1),
+                "ocr_used": bool(ocr),
+            },
             "guardrails": {
                 "size_limit_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
                 "archive_bomb_check": ext in {
