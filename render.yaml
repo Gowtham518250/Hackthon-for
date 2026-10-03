@@ -2,17 +2,15 @@ services:
   - type: web
     name: deepsearch-api
     runtime: python
+    plan: free
     region: singapore
-    plan: 1c-2g
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
-    disk:
-      name: deepsearch-data
-      mountPath: /var/data
-      sizeGB: 10
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: DATABASE_URL
         fromDatabase:
           name: deepsearch-db
@@ -29,7 +27,7 @@ services:
       - key: REFRESH_TOKEN_DAYS
         value: "7"
       - key: FRONTEND_ORIGIN
-        value: https://deepsearch-ui.onrender.com
+        value: https://hackthon-for.onrender.com
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
@@ -37,7 +35,7 @@ services:
       - key: STORAGE_BACKEND
         value: local
       - key: LOCAL_STORAGE_DIR
-        value: /var/data/storage
+        value: /tmp/deepsearch/storage
       - key: UPLOAD_DIR
         value: /tmp/deepsearch
       - key: EMBEDDING_MODEL_REPO
@@ -58,7 +56,7 @@ services:
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
-    staticPublishPath: frontend/dist
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
         value: https://deepsearch-api.onrender.com
@@ -66,4 +64,5 @@ services:
 databases:
   - name: deepsearch-db
     region: singapore
+    plan: free
     databaseName: deepsearch
