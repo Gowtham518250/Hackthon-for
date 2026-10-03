@@ -381,10 +381,14 @@ def verify_registration(data: VerifyRegistrationRequest):
     }
 
 
+class ResendRegistrationOtpRequest(BaseModel):
+    email: EmailStr
+
+
 @app.post("/api/auth/resend-registration-otp")
-def resend_registration_otp(email: EmailStr, request: Request):
+def resend_registration_otp(data: ResendRegistrationOtpRequest, request: Request):
     rate_limit(request, "registration_otp", 6)
-    normalized = str(email).lower().strip()
+    normalized = str(data.email).lower().strip()
     user_row = one("SELECT * FROM users WHERE email=?", (normalized,))
     if not user_row:
         raise HTTPException(404, "Account not found.")
