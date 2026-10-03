@@ -16,13 +16,39 @@ function navigate(path:string){window.history.pushState({},'',path);window.dispa
 function usePath(){const[path,setPath]=useState(window.location.pathname+window.location.search);useEffect(()=>{const f=()=>setPath(window.location.pathname+window.location.search);window.addEventListener("popstate",f);return()=>window.removeEventListener("popstate",f)},[]);return path}
 function queryParam(name:string){return new URLSearchParams(window.location.search).get(name)||""}
 
-function OrbitVisual({large=false}:{large?:boolean}){
-  return <div className={large?"orbit-visual large":"orbit-visual"}>
-    <div className="orbit-core"><div className="core-dot"/><div className="core-ring"/></div>
-    <div className="orbit-ring r1"><span/><i/></div>
-    <div className="orbit-ring r2"><span/><i/></div>
-    <div className="orbit-ring r3"><span/><i/></div>
-  </div>
+function DeepSearchVisual({large=false}:{large?:boolean}){
+  return <div className={large?"ds-visual large":"ds-visual"}>
+    <div className="ds-glow glow-a"/>
+    <div className="ds-glow glow-b"/>
+    <div className="ds-particle-field">
+      {Array.from({length:18}).map((_,i)=><span key={i} style={{["--i" as any]:i} as React.CSSProperties}/>)}
+    </div>
+
+    <motion.div className="ds-core-card" animate={{y:[0,-10,0],rotateZ:[0,.6,0]}} transition={{duration:5,repeat:Infinity,ease:"easeInOut"}}>
+      <div className="ds-core-icon"><Database size={large?24:18}/></div>
+      <div className="ds-core-lines"><span/><span/><span/></div>
+      <div className="ds-core-status"><i/>INDEXED</div>
+    </motion.div>
+
+    <motion.div className="ds-float-card card-pdf" animate={{y:[0,-16,0],x:[0,6,0],rotateZ:[-3,0,-3]}} transition={{duration:5.4,repeat:Infinity,ease:"easeInOut"}}>
+      <FileText size={15}/><div><b>report.pdf</b><small>page 42 · 91% match</small></div>
+    </motion.div>
+
+    <motion.div className="ds-float-card card-data" animate={{y:[0,11,0],x:[0,-5,0],rotateZ:[4,1,4]}} transition={{duration:4.6,repeat:Infinity,ease:"easeInOut",delay:.4}}>
+      <Sheet size={15}/><div><b>sales.xlsx</b><small>sheet Q3 · 1,284 rows</small></div>
+    </motion.div>
+
+    <motion.div className="ds-float-card card-ai" animate={{y:[0,-12,0],x:[0,5,0],scale:[1,1.03,1]}} transition={{duration:4.2,repeat:Infinity,ease:"easeInOut",delay:.8}}>
+      <Sparkles size={15}/><div><b>Grounded answer</b><small>3 citations · Groq</small></div>
+    </motion.div>
+
+    <motion.div className="ds-float-card card-ocr" animate={{y:[0,9,0],x:[0,-4,0]}} transition={{duration:5.8,repeat:Infinity,ease:"easeInOut",delay:1.1}}>
+      <ScanText size={15}/><div><b>OCR extracted</b><small>image → searchable text</small></div>
+    </motion.div>
+
+    <div className="ds-sweep sweep-one"/>
+    <div className="ds-sweep sweep-two"/>
+  </div>;
 }
 
 function Node({position,label,active,onClick,color}:any){
@@ -74,7 +100,7 @@ function AboutPage(){
         </div>
 
         <div className="hero-orbit-stage">
-          <OrbitVisual large/>
+          <DeepSearchVisual large/>
           <div className="hero-chip chip-top"><FileText size={14}/><b>PDF</b><span>page-aware</span></div>
           <div className="hero-chip chip-left"><Network size={14}/><b>SEMANTIC</b><span>vector retrieval</span></div>
           <div className="hero-chip chip-right"><ScanText size={14}/><b>OCR</b><span>image extraction</span></div>
@@ -110,7 +136,7 @@ function AuthShell({title,subtitle,children}:{title:string;subtitle:string;child
     </header>
     <main className="auth-center-page">
       <section className="auth-card">
-        <div className="auth-orb"><OrbitVisual/></div>
+        <div className="auth-orb"><DeepSearchVisual/></div>
         <div className="auth-copy">
           <div className="auth-kicker">PRIVATE WORKSPACE</div>
           <h2>{title}</h2>
