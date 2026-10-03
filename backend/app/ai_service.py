@@ -102,6 +102,10 @@ def _requested_difficulty(query: str) -> str | None:
     return None
 
 
+def _is_summary_query(query: str) -> bool:
+    q = re.sub(r"\s+", " ", query.lower().strip())
+    return bool(re.search(r"\b(what is|what's|summarize|summarise|overview).*(file|document|pdf|sheet).*(about|contain|summary|overview)\b", q))
+
 def _generate_sync(prompt: str) -> str:
     client = _client()
     if client is None:
