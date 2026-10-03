@@ -62,7 +62,7 @@ function AboutPage(){
   </Layout>
 }
 
-function AuthShell({title,subtitle,children,footer}:{title:string;subtitle:string;children:React.ReactNode;footer:React.ReactNode}){
+function AuthShell({title,subtitle,children}:{title:string;subtitle:string;children:React.ReactNode}){
   return <Layout><div className="auth-bg"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div><div className="auth-grid"/>
     <header className="auth-nav"><button className="brand-mark link-brand" onClick={()=>navigate("/about")}><span>DEEP</span>SEARCH</button><button className="back-link" onClick={()=>navigate("/about")}>Back to about</button></header>
     <main className="auth-layout"><section className="auth-visual"><OrbitVisual large/><div className="auth-visual-copy"><div className="eyebrow">PRIVATE WORKSPACE</div><h2>{title}</h2><p>{subtitle}</p><div className="auth-pills"><span>6 guardrails</span><span>FAISS semantic</span><span>Groq grounded AI</span></div></div></section><motion.section className="auth-panel" initial={{opacity:0,y:20}} animate={{opacity:1,y:0}}>{children}{footer}</motion.section></main>
