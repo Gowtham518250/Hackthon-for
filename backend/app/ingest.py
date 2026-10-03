@@ -1,11 +1,14 @@
+from io import BytesIO
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import fitz
+from PIL import Image
 from docx import Document
 
 try:
-    from rapidocr_onnxruntime import RapidOCR
+    from rapidocr import RapidOCR
 
     _OCR = RapidOCR()
 except Exception:
@@ -15,15 +18,24 @@ except Exception:
 def _ocr_image(image_bytes: bytes) -> str:
     if _OCR is None:
         return ""
+
     try:
-        result, _ = _OCR(image_bytes)
-        if not result:
-            return ""
-        lines = []
-        for item in result:
-            if len(item) >= 2:
-                lines.append(str(item[1]))
-        return "\n".join(lines).strip()
+        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        result = _OCR(np.asarray(image))
+
+        # RapidOCR returns an object with txts in current releases; support
+        # tuple/list-shaped outputs too for compatibility with older builds.
+        if hasattr(result, "txts"):
+            values = result.txts or ()
+        elif isinstance(result, tuple) and result:
+            values = getattr(result[0], "txts", None) or result[0]
+        else:
+            values = result or []
+
+        if isinstance(values, str):
+            return values.strip()
+
+        return "\n".join(str(value) for value in values if value).strip()
     except Exception:
         return ""
 
@@ -68,9 +80,6 @@ def extract(path: Path):
             for row in table.rows
         ]
         text = "\n".join(paragraphs + [row for row in tables if row])
-
-        # DOCX content is already text-extractable. Embedded-image OCR can be
-        # added later without changing the object-storage/indexing pipeline.
         refs = ["document"]
 
     elif ext in {".xlsx", ".xls"}:
@@ -79,8 +88,7 @@ def extract(path: Path):
         for sheet_name, frame in sheets.items():
             if not frame.empty:
                 frames.append(
-                    f"Sheet: {sheet_name}\n"
-                    + frame.to_csv(index=True)
+                    f"Sheet: {sheet_name}\n" + frame.to_csv(index=True)
                 )
         text = "\n".join(frames)
         refs = list(sheets.keys()) or ["table"]
