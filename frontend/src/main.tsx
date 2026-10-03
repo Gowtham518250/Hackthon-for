@@ -294,6 +294,8 @@ function JudgeProofSection(){
 }
 
 
+function HomePage(){
+
   const[scrollProgress,setScrollProgress]=useState(0);
   useEffect(()=>{
     const onScroll=()=>{
