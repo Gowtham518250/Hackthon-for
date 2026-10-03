@@ -170,51 +170,37 @@ def register(b: Register, request: Request):
         raise HTTPException(409, "This email is already registered. Please sign in.")
 
     uid = str(uuid.uuid4())
+    # Match the simple Retail Mind-style registration flow: account is created
+    # and the user receives an access token immediately. OTP is used for the
+    # sensitive password-reset flow.
     exe(
         "INSERT INTO users VALUES(?,?,?,?,?,?)",
-        (uid, email, b.full_name.strip(), hash_password(b.password), 0, now()),
+        (
+            uid,
+            email,
+            b.full_name.strip(),
+            hash_password(b.password),
+            1,
+            now(),
+        ),
     )
 
-    email_sent = False
-    try:
-        challenge_id = str(uuid.uuid4())
-        otp = new_otp()
-        created = utcnow()
-
-        subject, body = otp_email(otp, "Email Verification")
-        email_sent = send_email(email, subject, body)
-
-        if email_sent:
-            exe(
-                """
-                INSERT INTO otp_challenges
-                    (id,user_id,email,purpose,otp_hash,expires_at,attempts,used,created_at,
-                     reset_jti,reset_expires_at,reset_used)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    challenge_id,
-                    uid,
-                    email,
-                    "EMAIL_VERIFICATION",
-                    hash_otp(otp),
-                    iso(created + timedelta(minutes=OTP_EXPIRE_MINUTES)),
-                    0,
-                    0,
-                    iso(created),
-                    None,
-                    None,
-                    0,
-                ),
-            )
-    except Exception:
-        logger.exception("Registration OTP send failed")
+    access, _, _ = create_token(
+        uid,
+        "access",
+        timedelta(minutes=settings.access_minutes),
+    )
 
     return {
-        "message": "Account created. Verify the OTP sent to your email.",
-        "verification_required": True,
-        "email": email,
-        "email_sent": email_sent,
+        "message": "Account created successfully.",
+        "access_token": access,
+        "token_type": "bearer",
+        "user": {
+            "id": uid,
+            "email": email,
+            "full_name": b.full_name.strip(),
+        },
+        "redirect": "/dashboard",
     }
 
 
