@@ -1434,3 +1434,104 @@
   .chat-file-list{align-content:start;max-height:150px;overflow-y:auto}
   .chat-file-item{min-height:52px}
 }
+
+
+/* ===== Chat readability + motion polish ===== */
+.chat-main{
+  position:relative;
+  overflow:hidden;
+}
+.chat-main:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.18;
+  background:
+    radial-gradient(circle at 78% 18%,rgba(104,124,255,.16),transparent 25%),
+    radial-gradient(circle at 28% 78%,rgba(171,94,245,.10),transparent 22%);
+  animation:chatAtmosphere 10s ease-in-out infinite;
+}
+.chat-main:after{
+  content:"";position:absolute;left:0;right:0;top:84px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,#5f74c9,transparent);
+  opacity:.28;animation:chatScanner 5s ease-in-out infinite;
+}
+@keyframes chatAtmosphere{0%,100%{opacity:.12;transform:scale(1)}50%{opacity:.24;transform:scale(1.04)}}
+@keyframes chatScanner{0%,100%{transform:translateY(0);opacity:.08}50%{transform:translateY(65vh);opacity:.35}}
+.chat-main>*{position:relative;z-index:1}
+.chat-header{
+  position:relative;
+  overflow:hidden;
+}
+.chat-header:after{
+  content:"";position:absolute;left:-30%;bottom:0;width:35%;height:1px;
+  background:linear-gradient(90deg,transparent,#a070ff,transparent);
+  animation:headerBeam 5s linear infinite;
+}
+@keyframes headerBeam{to{left:105%}}
+.chat-messages{
+  scroll-behavior:smooth;
+}
+.chat-message{
+  animation:messageIn .42s cubic-bezier(.2,.8,.2,1) both;
+}
+.chat-message:nth-child(2){animation-delay:.04s}.chat-message:nth-child(3){animation-delay:.08s}.chat-message:nth-child(4){animation-delay:.12s}
+@keyframes messageIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+.chat-message.user{
+  grid-template-columns:minmax(0,760px) 34px;
+  justify-content:end;
+}
+.chat-message.user .chat-avatar{
+  grid-column:2;
+  grid-row:1;
+  justify-self:end;
+}
+.chat-message.user .chat-bubble{
+  grid-column:1;
+  grid-row:1;
+  justify-self:end;
+  width:fit-content;
+  max-width:760px;
+}
+.chat-message.user .chat-bubble p{
+  white-space:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  max-width:100%;
+}
+.chat-bubble{
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.chat-bubble:hover{
+  transform:translateY(-1px);
+  border-color:#314875;
+  box-shadow:0 18px 42px rgba(35,49,98,.20);
+}
+.chat-message.user .chat-bubble{
+  background:linear-gradient(135deg,#101b39,#0c1630);
+}
+.chat-message.assistant .chat-avatar{
+  animation:assistantGlow 2.4s ease-in-out infinite;
+}
+@keyframes assistantGlow{0%,100%{box-shadow:0 0 0 rgba(125,146,255,0)}50%{box-shadow:0 0 22px rgba(125,146,255,.18)}}
+.chat-composer{
+  position:relative;
+  overflow:hidden;
+}
+.chat-composer:before{
+  content:"";position:absolute;left:-15%;top:0;width:25%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(116,137,255,.14),transparent);
+  transform:skewX(-18deg);animation:composerSweep 4.6s linear infinite;
+}
+@keyframes composerSweep{to{left:125%}}
+.chat-composer textarea,.chat-composer button{position:relative;z-index:1}
+.chat-composer button{
+  transition:transform .18s ease,filter .18s ease,box-shadow .18s ease;
+}
+.chat-composer button:hover:not(:disabled){
+  transform:translateY(-2px);
+  filter:brightness(1.08);
+  box-shadow:0 10px 30px rgba(101,127,255,.22);
+}
+.chat-side-new,.chat-file-item,.chat-side-back{
+  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+}
+.chat-side-new:hover,.chat-side-back:hover{transform:translateX(2px)}
+.chat-file-item:hover{transform:translateX(3px)}
