@@ -122,6 +122,6 @@ function Dashboard(){
 }
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
-function App(){const path=usePath();const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(path==="/dashboard"&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
+function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(path==="/dashboard"&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
   if(path==="/"||path==="/about")return <AboutPage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password"||path==="/reset-password")return <ForgotPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;return <AboutPage/>}
 createRoot(document.getElementById("root")!).render(<App/>);
