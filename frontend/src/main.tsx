@@ -4,7 +4,7 @@ import{createRoot}from"react-dom/client";
 import{Canvas}from"@react-three/fiber";
 import{Float,OrbitControls,Stars,Text,Line,Sparkles as ThreeSparkles}from"@react-three/drei";
 import{motion,AnimatePresence}from"framer-motion";
-import{Search,Upload,LogOut,FileText,Image as ImageIcon,Sheet,ShieldCheck,Database,Sparkles,LockKeyhole,Trash2,X,BrainCircuit,Network,Layers3,ArrowUpRight,Activity,FileSearch,ScanText,ChevronRight,CircleCheck,AlertTriangle,Mail,ArrowRight,RefreshCcw,BookOpen,KeyRound}from"lucide-react";
+import{Search,Upload,LogOut,FileText,Image as ImageIcon,Sheet,ShieldCheck,Database,Sparkles,LockKeyhole,Trash2,X,BrainCircuit,Network,Layers3,ArrowUpRight,Activity,FileSearch,ScanText,ChevronRight,CircleCheck,AlertTriangle,Mail,ArrowRight,RefreshCcw,BookOpen,KeyRound,FolderOpen}from"lucide-react";
 import"./styles.css";
 import{api,clearAuthToken}from"./api";
 
@@ -301,51 +301,191 @@ function HomePage(){
 }
 
 
-function AuthShell({title,subtitle,children}:{title:string;subtitle:string;children:React.ReactNode}){
+
+function AuthScene({kind}:{kind:"login"|"register"|"forgot"|"verify"|"reset"}){
+  const title=kind==="verify"?"VERIFY":kind==="forgot"||kind==="reset"?"RECOVER":kind==="register"?"CREATE":"SEARCH";
+  return <div className="auth-scene">
+    <Canvas camera={{position:[0,0,7],fov:42}} dpr={[1,1.5]}>
+      <ambientLight intensity={.55}/>
+      <pointLight position={[3,4,5]} intensity={16} color="#7f91ff"/>
+      <pointLight position={[-3,-1,4]} intensity={8} color="#b76dff"/>
+      <Stars radius={32} depth={18} count={620} factor={1.6} saturation={0} fade/>
+      <ThreeSparkles count={95} scale={[10,7,8]} size={1.5} speed={.2} color="#9caaff"/>
+      <Float speed={.65} floatIntensity={.18}>
+        <mesh rotation={[.2,-.35,.08]}>
+          <boxGeometry args={[1.75,1.12,.22]}/>
+          <meshStandardMaterial color="#111b45" emissive="#263799" emissiveIntensity={.9} metalness={.85} roughness={.23}/>
+        </mesh>
+        <mesh position={[0,.1,.16]}>
+          <boxGeometry args={[1.28,.08,.04]}/>
+          <meshBasicMaterial color="#8497ff"/>
+        </mesh>
+        <mesh position={[0,-.12,.16]}>
+          <boxGeometry args={[.92,.06,.04]}/>
+          <meshBasicMaterial color="#5f73d8"/>
+        </mesh>
+      </Float>
+      {[
+        ["PDF",-2.2,1.45,"#e66f91"],
+        ["DOCX",2.15,1.2,"#708eff"],
+        ["XLSX",2.2,-1.15,"#69c8a0"],
+        ["OCR",-2.1,-1.25,"#ba78ff"],
+      ].map(([label,x,y,color],i)=>
+        <Float key={i} speed={1+i*.08} floatIntensity={.35}>
+          <group position={[x as number,y as number,.15]}>
+            <mesh>
+              <boxGeometry args={[.62,.78,.08]}/>
+              <meshStandardMaterial color={color as string} emissive={color as string} emissiveIntensity={.65} metalness={.55} roughness={.28}/>
+            </mesh>
+            <Text position={[0,-.06,.08]} fontSize={.12} color="#fff" anchorX="center">{label as string}</Text>
+          </group>
+        </Float>
+      )}
+    </Canvas>
+    <div className="auth-scene-copy">
+      <div className="auth-scene-kicker">DEEPSEARCH</div>
+      <h2>{title}</h2>
+      <p>{kind==="verify"?"Secure email verification keeps your workspace protected.":kind==="forgot"||kind==="reset"?"Recover access with a short-lived email OTP.":"Private document intelligence with evidence-first AI."}</p>
+      <div className="auth-scene-tags"><span>PDF</span><span>DOCX</span><span>XLSX</span><span>OCR</span><span>GROQ</span></div>
+    </div>
+  </div>;
+}
+
+function AuthShell({kind,title,subtitle,children}:{kind:"login"|"register"|"forgot"|"verify"|"reset";title:string;subtitle:string;children:React.ReactNode}){
   return <Layout>
-    <div className="auth-space"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div>
-    <header className="auth-nav">
-      <button className="brand-mark link-brand" onClick={()=>navigate("/about")}><span>DEEP</span>SEARCH</button>
-      <button className="back-link" onClick={()=>navigate("/about")}>About DeepSearch</button>
-    </header>
-    <main className="auth-center-page">
-      <section className="auth-card">
-        <div className="auth-orb"><DeepSearchVisual/></div>
-        <div className="auth-copy">
-          <div className="auth-kicker">PRIVATE WORKSPACE</div>
-          <h2>{title}</h2>
-          <p>{subtitle}</p>
-        </div>
-        {children}
-      </section>
-    </main>
-  </Layout>
+    <div className="auth-page">
+      <header className="auth-page-nav">
+        <button className="brand-mark link-brand" onClick={()=>navigate("/")}>
+          <span>DEEP</span>SEARCH
+        </button>
+        <button className="auth-home-link" onClick={()=>navigate("/")}>Back to home <ArrowRight size={13}/></button>
+      </header>
+      <div className="auth-page-scene"><AuthScene kind={kind}/></div>
+      <main className="auth-page-main">
+        <motion.section className="auth-form-card" initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{duration:.45}}>
+          <div className="auth-form-header">
+            <div className="auth-mini-brand"><span>DEEP</span>SEARCH</div>
+            <div className="auth-kicker">PRIVATE WORKSPACE</div>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </div>
+          {children}
+        </motion.section>
+      </main>
+    </div>
+  </Layout>;
 }
+
 function LoginPage(){
-  const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
-  async function submit(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{await api.login({email,password});navigate("/dashboard")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
-  return <AuthShell title="Welcome back" subtitle="Sign in and return to your private document intelligence workspace."><div className="auth-kicker">SIGN IN</div><h1 className="auth-title">Enter DeepSearch</h1><p className="auth-subtitle">Your corpus stays tied to your account.</p>
-    <form className="auth-form" onSubmit={submit}><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required/></label><label><span className="field-label-row">Password<button type="button" className="inline-link" onClick={()=>navigate("/forgot-password")}>Forgot password?</button></span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required/></label><button className="gradient-button" disabled={loading}>{loading?"Signing in…":"Sign in"}<ArrowRight size={16}/></button></form>{msg&&<div className="alert">{msg}</div>}{footerNav("New here?","Create an account","/register")}</AuthShell>
+  const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);const[verifyNeeded,setVerifyNeeded]=useState(false);
+  async function submit(e:React.FormEvent){
+    e.preventDefault();setLoading(true);setMsg("");setVerifyNeeded(false);
+    try{await api.login({email,password});navigate("/dashboard")}
+    catch(err:any){setMsg(err.message);setVerifyNeeded(String(err.message).toLowerCase().includes("verify your email"))}
+    finally{setLoading(false)}
+  }
+  return <AuthShell kind="login" title="Welcome back" subtitle="Sign in to search your files with evidence-first AI.">
+    <form className="auth-form-main" onSubmit={submit}>
+      <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required/></label>
+      <label><span className="field-label-row">Password<button type="button" className="inline-link" onClick={()=>navigate("/forgot-password")}>Forgot password?</button></span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required/></label>
+      <label className="check-line"><input type="checkbox"/> <span>Remember me</span></label>
+      <button className="auth-submit" disabled={loading}>{loading?"Signing in…":"Sign in"}<ArrowRight size={16}/></button>
+    </form>
+    {msg&&<div className="auth-alert">{msg}</div>}
+    {verifyNeeded&&<button className="auth-secondary" onClick={()=>navigate("/check-email?email="+encodeURIComponent(email))}>Verify email <Mail size={14}/></button>}
+    <div className="auth-divider"><span>PRIVATE WORKSPACE</span></div>
+    <p className="auth-switch">New here? <button onClick={()=>navigate("/register")}>Create an account</button></p>
+  </AuthShell>;
 }
+
 function RegisterPage(){
   const[name,setName]=useState("");const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
-  async function submit(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{await api.register({full_name:name,email,password});navigate("/dashboard")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
-  return <AuthShell title="Create your workspace" subtitle="Register once and enter your private DeepSearch dashboard immediately."><div className="auth-kicker">CREATE ACCOUNT</div><h1 className="auth-title">Build your corpus</h1><p className="auth-subtitle">Your account is created securely and you are signed in automatically.</p>
-    <form className="auth-form" onSubmit={submit}><label>Full name<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name" required minLength={2}/></label><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8}/></label><button className="gradient-button" disabled={loading}>{loading?"Creating…":"Create account"}<ArrowRight size={16}/></button></form>{msg&&<div className="alert">{msg}</div>}{footerNav("Already have an account?","Sign in","/login")}</AuthShell>
+  async function submit(e:React.FormEvent){
+    e.preventDefault();setLoading(true);setMsg("");
+    try{const d=await api.register({full_name:name,email,password});navigate("/check-email?email="+encodeURIComponent(d.email||email))}
+    catch(err:any){setMsg(err.message)}
+    finally{setLoading(false)}
+  }
+  return <AuthShell kind="register" title="Create your account" subtitle="Join DeepSearch and unlock intelligent file search.">
+    <form className="auth-form-main" onSubmit={submit}>
+      <label>Full name<input value={name} onChange={e=>setName(e.target.value)} placeholder="Your full name" required minLength={2}/></label>
+      <label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required/></label>
+      <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8}/></label>
+      <label className="terms-line"><input type="checkbox" required/> <span>I agree to the Terms of Service and Privacy Policy</span></label>
+      <button className="auth-submit" disabled={loading}>{loading?"Creating…":"Create account & send code"}<ArrowRight size={16}/></button>
+    </form>
+    {msg&&<div className="auth-alert">{msg}</div>}
+    <p className="auth-switch">Already have an account? <button onClick={()=>navigate("/login")}>Sign in</button></p>
+  </AuthShell>;
 }
+
+function CheckEmailPage(){
+  const email=queryParam("email");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);const[seconds,setSeconds]=useState(0);
+  useEffect(()=>{if(seconds<=0)return;const t=setInterval(()=>setSeconds(v=>Math.max(0,v-1)),1000);return()=>clearInterval(t)},[seconds]);
+  async function resend(){if(seconds>0)return;setLoading(true);setMsg("");try{await api.resendRegistrationOtp(email);setSeconds(60);setMsg("A fresh verification OTP was sent.")}catch(e:any){setMsg(e.message)}finally{setLoading(false)}}
+  return <AuthShell kind="verify" title="Check your email" subtitle={"We sent a 6-digit verification OTP to "+email+". The code expires in 10 minutes."}>
+    <div className="check-email-art"><Mail size={58}/><div className="check-mail-badge">✓</div></div>
+    <div className="check-steps"><span><Mail size={15}/> Open your email</span><span><KeyRound size={15}/> Copy the 6-digit code</span><span><ShieldCheck size={15}/> Verify and open dashboard</span></div>
+    <button className="auth-submit" onClick={()=>navigate("/verify-email?email="+encodeURIComponent(email))}>Enter verification code <ArrowRight size={16}/></button>
+    <button className="auth-secondary" onClick={resend} disabled={loading||seconds>0}>{seconds?("Resend OTP in "+seconds+"s"):(loading?"Sending…":"Resend verification OTP")}<RefreshCcw size={14}/></button>
+    {msg&&<div className="auth-alert">{msg}</div>}
+    <p className="auth-switch"><button onClick={()=>navigate("/login")}>Back to sign in</button></p>
+  </AuthShell>;
+}
+
 function VerifyEmailPage(){
-  const[email,setEmail]=useState(queryParam("email"));const[otp,setOtp]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);const[resend,setResend]=useState(0);
-  useEffect(()=>{if(resend<=0)return;const t=setInterval(()=>setResend(x=>Math.max(0,x-1)),1000);return()=>clearInterval(t)},[resend]);
+  const email=queryParam("email");const[otp,setOtp]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
   async function verify(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{await api.verifyRegistration({email,otp});navigate("/dashboard")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
-  async function resendOtp(){if(resend>0)return;setLoading(true);setMsg("");try{await api.resendRegistrationOtp(email);setResend(60);setMsg("A new OTP has been sent.")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
-  return <AuthShell title="Verify your email" subtitle="One final step before DeepSearch opens your workspace."> <div className="auth-kicker">EMAIL VERIFICATION</div><h1 className="auth-title">Enter your OTP</h1><p className="auth-subtitle">We sent a 6-digit code to <b>{email}</b>.</p><form className="auth-form" onSubmit={verify}><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></label><label>6-digit OTP<input inputMode="numeric" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000" maxLength={6} autoComplete="one-time-code" required/></label><button className="gradient-button" disabled={loading}>{loading?"Verifying…":"Verify & open dashboard"}<ArrowRight size={16}/></button></form><button className="otp-resend" onClick={resendOtp} disabled={loading||resend>0}><RefreshCcw size={14}/>{resend>0?"Resend in "+resend+"s":"Resend OTP"}</button>{msg&&<div className="alert">{msg}</div>}</AuthShell>
+  return <AuthShell kind="verify" title="Verify your email" subtitle={"Enter the 6-digit code sent to "+email+"."}>
+    <form className="auth-form-main" onSubmit={verify}>
+      <label>Verification code<input className="otp-input" inputMode="numeric" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000" maxLength={6} autoComplete="one-time-code" required/></label>
+      <button className="auth-submit" disabled={loading}>{loading?"Verifying…":"Verify email"}<ArrowRight size={16}/></button>
+    </form>
+    {msg&&<div className="auth-alert">{msg}</div>}
+    <p className="auth-switch">Didn't receive it? <button onClick={()=>navigate("/check-email?email="+encodeURIComponent(email))}>Resend OTP</button></p>
+  </AuthShell>;
 }
+
 function ForgotPasswordPage(){
-  const[email,setEmail]=useState(queryParam("email"));const[step,setStep]=useState<"request"|"verify"|"reset">("request");const[otp,setOtp]=useState("");const[resetToken,setResetToken]=useState("");const[pw,setPw]=useState("");const[confirm,setConfirm]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
-  async function submit(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{if(step==="request"){await api.forgotPassword(email);setStep("verify");setMsg("If the account exists, the OTP has been sent.")}else if(step==="verify"){const d=await api.verifyResetOtp({email,otp});setResetToken(d.reset_token);setStep("reset");setMsg("OTP verified. Create a new password.")}else{if(pw!==confirm)throw new Error("Passwords do not match.");await api.resetPassword({reset_token:resetToken,new_password:pw});navigate("/login")}}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
-  return <AuthShell title="Recover your account" subtitle="Use the same 6-digit email OTP pattern used by Retail Mind: secure, expiring and attempt-limited."><div className="auth-kicker">PASSWORD RESET</div><h1 className="auth-title">{step==="request"?"Forgot password":step==="verify"?"Verify reset OTP":"Set new password"}</h1><p className="auth-subtitle">{step==="request"?"We’ll email a 6-digit OTP.":step==="verify"?"The code expires in 10 minutes.":"Your new password must be at least 8 characters."}</p>
-    <form className="auth-form" onSubmit={submit}>{step==="request"&&<label>Registered email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></label>}{step==="verify"&&<><label>6-digit OTP<input inputMode="numeric" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} maxLength={6} autoComplete="one-time-code" required/></label><button type="button" className="otp-resend" onClick={()=>{setStep("request");setMsg("")}}><Mail size={14}/> Request a new OTP</button></>}{step==="reset"&&<><label>New password<input type="password" value={pw} onChange={e=>setPw(e.target.value)} minLength={8} required/></label><label>Confirm password<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} minLength={8} required/></label></>}<button className="gradient-button" disabled={loading}>{loading?"Working…":step==="request"?"Send OTP":step==="verify"?"Verify OTP":"Reset password"}<ArrowRight size={16}/></button></form>{msg&&<div className="alert">{msg}</div>}{footerNav("Remembered your password?","Back to sign in","/login")}</AuthShell>
+  const[email,setEmail]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
+  async function submit(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{await api.forgotPassword(email);navigate("/verify-reset?email="+encodeURIComponent(email))}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
+  return <AuthShell kind="forgot" title="Forgot password?" subtitle="Enter your email and we’ll send you a verification OTP to reset your password.">
+    <form className="auth-form-main" onSubmit={submit}>
+      <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" required/></label>
+      <button className="auth-submit" disabled={loading}>{loading?"Sending OTP…":"Send verification OTP"}<ArrowRight size={16}/></button>
+    </form>
+    {msg&&<div className="auth-alert">{msg}</div>}
+    <p className="auth-switch"><button onClick={()=>navigate("/login")}>Back to sign in</button></p>
+  </AuthShell>;
 }
+
+function VerifyResetPage(){
+  const email=queryParam("email");const[otp,setOtp]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
+  async function submit(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{const d=await api.verifyResetOtp({email,otp});sessionStorage.setItem("deep_reset_token",d.reset_token);navigate("/reset-password")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
+  return <AuthShell kind="reset" title="Enter your OTP" subtitle={"Check the email sent to "+email+" and enter the 6-digit code."}>
+    <form className="auth-form-main" onSubmit={submit}>
+      <label>6-digit OTP<input className="otp-input" inputMode="numeric" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000" maxLength={6} autoComplete="one-time-code" required/></label>
+      <button className="auth-submit" disabled={loading}>{loading?"Checking…":"Verify OTP"}<ArrowRight size={16}/></button>
+    </form>
+    {msg&&<div className="auth-alert">{msg}</div>}
+    <p className="auth-switch"><button onClick={()=>navigate("/forgot-password")}>Request another OTP</button></p>
+  </AuthShell>;
+}
+
+function ResetPasswordPage(){
+  const[token,setToken]=useState(()=>sessionStorage.getItem("deep_reset_token")||"");const[pw,setPw]=useState("");const[confirm,setConfirm]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
+  useEffect(()=>{if(!token)navigate("/forgot-password")},[token]);
+  async function submit(e:React.FormEvent){e.preventDefault();if(pw!==confirm){setMsg("Passwords do not match.");return}setLoading(true);setMsg("");try{await api.resetPassword({reset_token:token,new_password:pw});sessionStorage.removeItem("deep_reset_token");navigate("/login")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
+  return <AuthShell kind="reset" title="Create a new password" subtitle="Choose a new password and then sign in again.">
+    <form className="auth-form-main" onSubmit={submit}>
+      <label>New password<input type="password" value={pw} onChange={e=>setPw(e.target.value)} minLength={8} required/></label>
+      <label>Confirm password<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} minLength={8} required/></label>
+      <button className="auth-submit" disabled={loading}>{loading?"Saving…":"Reset password"}<ArrowRight size={16}/></button>
+    </form>
+    {msg&&<div className="auth-alert">{msg}</div>}
+  </AuthShell>;
+}
+
 function footerNav(prefix:string,label:string,path:string){return <p className="switch-text">{prefix} <button className="link-button" onClick={()=>navigate(path)}>{label}</button></p>}
 
 function WorkspaceUniverse({files}:{files:FileRecord[]}){
@@ -367,9 +507,7 @@ function WorkspaceUniverse({files}:{files:FileRecord[]}){
     </Canvas>
     <div className="workspace-search-glass">
       <div className="search-glass-line"><Search size={19}/><span>Ask anything in your corpus...</span></div>
-      <div className="workspace-type-row">
-        <span>PDF</span><span>DOCX</span><span>XLSX</span><span>CSV</span><span>Images</span>
-      </div>
+      <div className="workspace-type-row"><span>PDF</span><span>DOCX</span><span>XLSX</span><span>CSV</span><span>Images</span></div>
     </div>
     {labels.map((f,i)=><motion.div key={i} className={"workspace-doc wd-"+i} animate={{y:[0,i%2?9:-9,0],rotateZ:[i%2?-3:3,0,i%2?-3:3]}} transition={{duration:4.5+i*.35,repeat:Infinity,ease:"easeInOut",delay:i*.18}}>
       {iconFor(f.mime_type||"")}<div><b>{f.name}</b><small>{i===0?"source evidence":i===1?"semantic match":"indexed document"}</small></div>
@@ -378,78 +516,198 @@ function WorkspaceUniverse({files}:{files:FileRecord[]}){
 }
 
 function Dashboard(){
-  const[user,setUser]=useState<any>(null);const[files,setFiles]=useState<FileRecord[]>([]);const[results,setResults]=useState<Result[]>([]);const[answer,setAnswer]=useState<AIAnswer|null>(null);const[stats,setStats]=useState<any>({files:0,chunks:0,embedded_chunks:0});const[selectedFile,setSelectedFile]=useState<any>(null);const[selectedChunks,setSelectedChunks]=useState<any[]>([]);const[query,setQuery]=useState("");const[loading,setLoading]=useState(false);const[uploading,setUploading]=useState(false);const[msg,setMsg]=useState("");
-  const load=async()=>{try{const[m,f,st]=await Promise.all([api.me(),api.files(),api.stats()]);setUser(m.user);setFiles(f.files||[]);setStats(st)}catch{clearAuthToken();navigate("/login")}};
+  const[user,setUser]=useState<any>(null);
+  const[files,setFiles]=useState<FileRecord[]>([]);
+  const[results,setResults]=useState<Result[]>([]);
+  const[answer,setAnswer]=useState<AIAnswer|null>(null);
+  const[stats,setStats]=useState<any>({files:0,chunks:0,embedded_chunks:0});
+  const[selectedFile,setSelectedFile]=useState<any>(null);
+  const[selectedChunks,setSelectedChunks]=useState<any[]>([]);
+  const[query,setQuery]=useState("");
+  const[loading,setLoading]=useState(false);
+  const[uploading,setUploading]=useState(false);
+  const[msg,setMsg]=useState("");
+  const[filter,setFilter]=useState("All");
+  const inputRef=React.useRef<HTMLInputElement>(null);
+
+  const load=async()=>{
+    try{
+      const[m,f,st]=await Promise.all([api.me(),api.files(),api.stats()]);
+      setUser(m.user);setFiles(f.files||[]);setStats(st);
+    }catch{clearAuthToken();navigate("/login")}
+  };
   useEffect(()=>{load()},[]);
-  async function deepSearch(){if(!query.trim())return;setLoading(true);setMsg("");try{const d=await api.deepSearch(query,20);setResults(d.results||[]);setAnswer(d.answer||null)}catch(e:any){setMsg("Deep Search failed: "+e.message)}finally{setLoading(false)}}
-  async function upload(e:React.ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];if(!file)return;setUploading(true);setMsg("Indexing "+file.name+"…");try{const d=await api.upload(file);setMsg(d.name+" indexed · "+d.chunks+" chunks · "+d.embedding_chunks+" semantic vectors");await load()}catch(err:any){setMsg("Indexing failed: "+err.message)}finally{setUploading(false);e.target.value=""}}
-  async function openFile(id:string){try{const[d,c]=await Promise.all([api.file(id),api.chunks(id)]);setSelectedFile(d.file);setSelectedChunks(c.chunks||[])}catch(e:any){setMsg(e.message)}}
-  async function removeFile(){if(!selectedFile)return;try{await api.deleteFile(selectedFile.id);setSelectedFile(null);await load()}catch(e:any){setMsg(e.message)}}
 
-  return <div className="workspace-reference">
-    <header className="workspace-topnav">
-      <button className="brand-mark link-brand" onClick={()=>navigate("/dashboard")}><span>DEEP</span>SEARCH</button>
-      <nav><button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>Dashboard</button><button onClick={()=>document.getElementById("workspace-results")?.scrollIntoView({behavior:"smooth"})}>Evidence</button><button onClick={()=>document.getElementById("workspace-corpus")?.scrollIntoView({behavior:"smooth"})}>Corpus</button></nav>
-      <div className="workspace-nav-actions">
-        <label className="nav-upload">{uploading?<Activity size={14}/>:<Upload size={14}/>} {uploading?"Indexing…":"Upload"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload} disabled={uploading}/></label>
-        <button className="workspace-user" onClick={()=>{clearAuthToken();navigate("/about")}}><span>{(user?.full_name||"U").slice(0,1).toUpperCase()}</span>{user?.full_name?.split(" ")[0]||"Account"}</button>
-      </div>
-    </header>
+  const recentSearches=useMemo(()=>{
+    try{return JSON.parse(localStorage.getItem("deep_recent_searches")||"[]")}catch{return[]}
+  },[results]);
 
-    <main>
-      <section className="workspace-hero">
-        <div className="workspace-copy">
-          <div className="hero-badge"><Sparkles size={13}/> PRIVATE FILE INTELLIGENCE</div>
-          <h1>Search your corpus.<br/><span>Understand the evidence.</span></h1>
-          <p>Welcome back, {user?.full_name?.split(" ")[0]||"there"}. Ask a question and DeepSearch retrieves relevant chunks before Groq explains them.</p>
-          <form className="workspace-command" onSubmit={e=>{e.preventDefault();deepSearch()}}>
-            <Search size={19}/>
-            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Ask: top 10 hard DSA questions, revenue in Q3..." />
-            <button type="submit" disabled={loading}><Sparkles size={15}/>{loading?"Searching…":"Deep Search"}</button>
-          </form>
-          <div className="workspace-chips">
-            <button onClick={()=>{setQuery("top 10 hard DSA questions");}}>"top 10 hard DSA questions"</button>
-            <button onClick={()=>{setQuery("summarize the project report");}}>"summarize the project report"</button>
-            <button onClick={()=>{setQuery("find revenue in Q3");}}>"find revenue in Q3"</button>
-          </div>
-          {msg&&<div className="message-bar">{msg}</div>}
-          <div className="workspace-stat-row">
-            <div><b>{stats.files}</b><span>indexed files</span></div>
-            <div><b>{stats.chunks}</b><span>retrieval chunks</span></div>
-            <div><b>{stats.embedded_chunks}</b><span>semantic vectors</span></div>
-            <div><b>Groq</b><span>grounded generation</span></div>
+  const fileTypeCounts=useMemo(()=>{
+    const counts={PDF:0,DOCX:0,XLSX:0,CSV:0,Images:0,Other:0};
+    for(const f of files){
+      const n=(f.name||"").toLowerCase();
+      if(n.endsWith(".pdf"))counts.PDF++;
+      else if(n.endsWith(".docx"))counts.DOCX++;
+      else if(n.endsWith(".xlsx")||n.endsWith(".xls"))counts.XLSX++;
+      else if(n.endsWith(".csv"))counts.CSV++;
+      else if([".png",".jpg",".jpeg"].some(x=>n.endsWith(x)))counts.Images++;
+      else counts.Other++;
+    }
+    return counts;
+  },[files]);
+
+  const recentFiles=useMemo(()=>{
+    const list=filter==="All"?files:files.filter(f=>{
+      const n=f.name.toLowerCase();
+      if(filter==="PDF")return n.endsWith(".pdf");
+      if(filter==="DOCX")return n.endsWith(".docx");
+      if(filter==="XLSX")return n.endsWith(".xlsx")||n.endsWith(".xls");
+      if(filter==="CSV")return n.endsWith(".csv");
+      if(filter==="Images")return [".png",".jpg",".jpeg"].some(x=>n.endsWith(x));
+      return true;
+    });
+    return list.slice(0,6);
+  },[files,filter]);
+
+  function saveSearch(q:string){
+    let old:string[]=[];
+    try{old=JSON.parse(localStorage.getItem("deep_recent_searches")||"[]")}catch{}
+    localStorage.setItem("deep_recent_searches",JSON.stringify([q,...old.filter(x=>x.toLowerCase()!==q.toLowerCase())].slice(0,8)));
+  }
+
+  async function deepSearch(q=query){
+    if(!q.trim())return;
+    setQuery(q);saveSearch(q);setLoading(true);setMsg("");
+    document.getElementById("dashboard-search-results")?.scrollIntoView({behavior:"smooth",block:"start"});
+    try{const d=await api.deepSearch(q,20);setResults(d.results||[]);setAnswer(d.answer||null)}
+    catch(e:any){setMsg("Deep Search failed: "+e.message)}
+    finally{setLoading(false)}
+  }
+
+  async function upload(e:React.ChangeEvent<HTMLInputElement>){
+    const file=e.target.files?.[0];if(!file)return;
+    setUploading(true);setMsg("Indexing "+file.name+"…");
+    try{const d=await api.upload(file);setMsg(d.name+" indexed · "+d.chunks+" chunks · "+d.embedding_chunks+" semantic vectors");await load()}
+    catch(err:any){setMsg("Indexing failed: "+err.message)}
+    finally{setUploading(false);e.target.value=""}
+  }
+
+  async function openFile(id:string){
+    try{const[d,c]=await Promise.all([api.file(id),api.chunks(id)]);setSelectedFile(d.file);setSelectedChunks(c.chunks||[])}
+    catch(e:any){setMsg(e.message)}
+  }
+
+  async function removeFile(){
+    if(!selectedFile)return;
+    try{await api.deleteFile(selectedFile.id);setSelectedFile(null);await load()}
+    catch(e:any){setMsg(e.message)}
+  }
+
+  function scrollSearch(){inputRef.current?.focus();window.scrollTo({top:0,behavior:"smooth"})}
+  function scrollFiles(){document.getElementById("recent-files")?.scrollIntoView({behavior:"smooth"})}
+
+  return <div className="reference-dashboard">
+    <aside className="dashboard-sidebar">
+      <div className="dashboard-brand"><span className="brand-glyph">◆</span><span>DEEP<span>SEARCH</span></span></div>
+      <div className="sidebar-workspace"><small>PRIVATE WORKSPACE</small><b>AI FILE INTELLIGENCE</b><span>Semantic · OCR · grounded AI</span></div>
+      <nav className="dashboard-nav">
+        <button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}><span>⌂</span>Home</button>
+        <button onClick={scrollSearch}><Search size={15}/>Search</button>
+        <button onClick={scrollFiles}><FileText size={15}/>My Files</button>
+        <button onClick={()=>document.getElementById("recent-files")?.scrollIntoView({behavior:"smooth"})}><RefreshCcw size={15}/>Recent</button>
+        <button onClick={()=>setMsg("Sharing is available after corpus sharing is enabled for this workspace.")}><Mail size={15}/>Shared With Me</button>
+        <button onClick={()=>setMsg("Favourites will appear here when you pin evidence.")}><ShieldCheck size={15}/>Favourites</button>
+        <button onClick={()=>setMsg("Deleted files are removed permanently in the current demo.")}><Trash2 size={15}/>Trash</button>
+      </nav>
+      <div className="sidebar-storage"><small>Corpus storage</small><b>{stats.files} files indexed</b><div className="storage-bar"><span style={{width:(Math.min(100,Math.max(4,(stats.chunks||0)/5)))+"%"}}/></div><span>{stats.chunks} retrieval chunks</span></div>
+      <div className="sidebar-profile" onClick={()=>{clearAuthToken();navigate("/")}}><div className="profile-avatar">{(user?.full_name||"G").slice(0,1).toUpperCase()}</div><div><b>{user?.full_name||"User"}</b><small>{user?.email||""}</small></div><LogOut size={14}/></div>
+    </aside>
+
+    <div className="dashboard-main">
+      <header className="dashboard-header">
+        <div><div className="dashboard-heading"><h1>DeepSearch</h1><span>PRIVATE FILE INTELLIGENCE</span></div><p>Search across PDFs, Word, Excel, CSV and images with evidence-first AI.</p></div>
+        <label className="dashboard-upload">{uploading?<Activity size={15}/>:<Upload size={15}/>} {uploading?"Indexing…":"Upload Files"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload} disabled={uploading}/></label>
+      </header>
+
+      <section className="dashboard-search-hero">
+        <div className="dashboard-searchbar">
+          <Search size={19}/>
+          <input ref={inputRef} value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")deepSearch()}} placeholder="Search across PDF, Word, Excel, CSV, images..." />
+          <button onClick={()=>deepSearch()} disabled={loading}>{loading?"Searching…":"Search"}</button>
+        </div>
+        <div className="dashboard-filter-row">
+          {["All","PDF","DOCX","XLSX","CSV","Images"].map(x=><button key={x} className={filter===x?"active":""} onClick={()=>setFilter(x)}>{x}</button>)}
+        </div>
+      </section>
+
+      {msg&&<div className="dashboard-message"><AlertTriangle size={14}/>{msg}</div>}
+
+      <section className="file-type-grid">
+        <div className="file-type-total"><div className="file-type-icon blue"><FileText size={20}/></div><div><b>{stats.files}</b><span>Total Files</span></div></div>
+        <div><div className="file-type-icon red"><FileText size={19}/></div><div><b>{fileTypeCounts.PDF}</b><span>PDF files</span></div></div>
+        <div><div className="file-type-icon blue"><FileText size={19}/></div><div><b>{fileTypeCounts.DOCX}</b><span>Word</span></div></div>
+        <div><div className="file-type-icon green"><Sheet size={19}/></div><div><b>{fileTypeCounts.XLSX}</b><span>Excel</span></div></div>
+        <div><div className="file-type-icon orange"><Sheet size={19}/></div><div><b>{fileTypeCounts.CSV}</b><span>CSV</span></div></div>
+        <div><div className="file-type-icon purple"><ImageIcon size={19}/></div><div><b>{fileTypeCounts.Images}</b><span>Images</span></div></div>
+      </section>
+
+      <section className="dashboard-grid-two">
+        <div id="recent-files" className="panel-box">
+          <div className="panel-heading"><div><b>Recent Files</b><span>Your latest indexed documents</span></div><button onClick={scrollFiles}>View all →</button></div>
+          <div className="recent-file-list">
+            {recentFiles.length?recentFiles.map(f=><button key={f.id} onClick={()=>openFile(f.id)} className="recent-file-row"><div className="recent-file-icon">{iconFor(f.mime_type||"")}</div><div><b>{f.name}</b><small>{f.mime_type||"file"} · {f.chunk_count} chunks</small></div><ChevronRight size={14}/></button>):<div className="dashboard-empty"><FileSearch size={24}/><b>No files yet</b><span>Upload your first document.</span></div>}
           </div>
         </div>
-        <WorkspaceUniverse files={files}/>
-      </section>
 
-      <section id="workspace-corpus" className="workspace-flow">
-        <div className="workspace-flow-card"><div className="flow-icon"><Upload size={18}/></div><div><b>1. Ingest</b><span>Upload PDF, Word, Excel, CSV or image.</span></div><ArrowRight size={17}/></div>
-        <div className="workspace-flow-card"><div className="flow-icon"><Network size={18}/></div><div><b>2. Retrieve</b><span>Semantic + lexical ranking finds relevant chunks.</span></div><ArrowRight size={17}/></div>
-        <div className="workspace-flow-card"><div className="flow-icon"><ShieldCheck size={18}/></div><div><b>3. Explain</b><span>Groq answers with validated citations.</span></div></div>
-      </section>
-
-      <section id="workspace-results" className="workspace-results-section">
-        <div className="workspace-section-head"><div><div className="section-eyebrow">EVIDENCE ENGINE</div><h2>Ranked evidence</h2></div><span>{results.length} matches</span></div>
-        <div className="workspace-results-grid">
-          <div className="workspace-result-list">
-            {results.length?results.map((r,i)=><article className="workspace-result" key={r.chunk_id}><div className="workspace-result-rank">{String(i+1).padStart(2,"0")}</div><div><div className="workspace-result-head"><div><b>{r.file_name}</b><small>{r.source_ref}</small></div><strong>{Math.round(r.score*100)}%</strong></div><p>{r.content}</p><div className="reason-row">{(r.match_reasons||[]).slice(0,3).map(x=><span key={x}>{x}</span>)}</div><button className="text-button" onClick={()=>openFile(r.file_id)}>View source <ArrowUpRight size={13}/></button></div></article>):<div className="workspace-empty"><Search size={25}/><b>No evidence yet</b><span>Run Deep Search to populate ranked evidence.</span></div>}
+        <div className="panel-box">
+          <div className="panel-heading"><div><b>Quick Actions</b><span>Jump straight into your workflow</span></div></div>
+          <div className="quick-action-grid">
+            <label className="quick-action blue"><Upload size={18}/><b>Upload Files</b><small>Index documents</small><input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload}/></label>
+            <button className="quick-action purple" onClick={scrollSearch}><Search size={18}/><b>New Search</b><small>Ask DeepSearch</small></button>
+            <button className="quick-action green" onClick={scrollFiles}><FileText size={18}/><b>View Corpus</b><small>Browse indexed files</small></button>
+            <button className="quick-action orange" onClick={()=>{setQuery("summarize my indexed files");deepSearch("summarize my indexed files")}}><BrainCircuit size={18}/><b>AI Summary</b><small>Grounded answer</small></button>
           </div>
-          <aside className="workspace-ai-card">
-            <div className="ai-panel-top"><div className="ai-orb"><Sparkles size={16}/></div><div><div className="eyebrow">GROUNDED AI</div><h3>Final answer</h3></div></div>
-            {answer?<><div className="workspace-confidence"><span>Confidence</span><b>{Math.round(answer.confidence)}%</b></div><div className="confidence-bar"><span style={{width:Math.max(0,Math.min(100,answer.confidence))+"%"}}/></div><p className="workspace-answer">{answer.answer}</p><div className="citation-block"><div className="eyebrow">CITATIONS</div>{answer.citations?.map((c:any,i:number)=><button key={i} className="citation-card" onClick={()=>openFile(c.file_id)}><FileText size={13}/><span><b>{c.file_name}</b><small>{c.source_ref}</small></span></button>)}</div></>:<div className="workspace-ai-empty"><BrainCircuit size={25}/><b>Ask the corpus.</b><span>Retrieve evidence first, then Groq produces a grounded answer.</span></div>}
+        </div>
+      </section>
+
+      <section className="dashboard-grid-two lower">
+        <div className="panel-box">
+          <div className="panel-heading"><div><b>Corpus Overview</b><span>{stats.chunks} retrieval chunks · {stats.embedded_chunks} semantic vectors</span></div></div>
+          <div className="corpus-overview">
+            <div className="overview-3d"><WorkspaceUniverse files={files}/></div>
+            <div className="overview-copy"><b>Every document becomes searchable.</b><p>Upload a file, let DeepSearch extract and chunk it, then search across its content using hybrid semantic and lexical retrieval.</p><button onClick={scrollSearch}>Search the corpus <ArrowRight size={13}/></button></div>
+          </div>
+        </div>
+
+        <div className="panel-box">
+          <div className="panel-heading"><div><b>Recent Searches</b><span>Your latest questions</span></div><button onClick={scrollSearch}>New search →</button></div>
+          <div className="recent-search-list">
+            {recentSearches.length?recentSearches.map((q:string,i:number)=><button key={q+i} onClick={()=>deepSearch(q)} className="recent-search-row"><RefreshCcw size={14}/><span>{q}</span><small>{i===0?"just now":(i+" ago")}</small><ArrowUpRight size={12}/></button>):<div className="dashboard-empty"><Search size={24}/><b>No searches yet</b><span>Your recent DeepSearch questions will appear here.</span></div>}
+          </div>
+        </div>
+      </section>
+
+      <section id="dashboard-search-results" className="dashboard-results">
+        <div className="panel-heading"><div><b>Ranked Evidence & Final Answer</b><span>Retrieved chunks are shown before Groq reasoning</span></div><span>{results.length} results</span></div>
+        <div className="results-and-ai">
+          <div className="results-list">
+            {results.length?results.map((r,i)=><article key={r.chunk_id} className="dashboard-result-card"><div className="result-rank">{String(i+1).padStart(2,"0")}</div><div><div className="result-title"><b>{r.file_name}</b><small>{r.source_ref}</small><strong>{Math.round(r.score*100)}%</strong></div><p>{r.content}</p><div className="reason-row">{(r.match_reasons||[]).slice(0,3).map(x=><span key={x}>{x}</span>)}</div><button className="text-button" onClick={()=>openFile(r.file_id)}>View evidence <ArrowUpRight size={13}/></button></div></article>):<div className="dashboard-empty"><Search size={24}/><b>No ranked evidence yet</b><span>Run a search to see the exact chunks used by AI.</span></div>}
+          </div>
+          <aside className="dashboard-ai">
+            <div className="ai-panel-top"><div className="ai-orb"><Sparkles size={15}/></div><div><div className="eyebrow">GROUNDED AI</div><h3>Final answer</h3></div></div>
+            {answer?<><div className="confidence-row"><span>Confidence</span><b>{Math.round(answer.confidence)}%</b></div><div className="confidence-bar"><span style={{width:Math.max(0,Math.min(100,answer.confidence))+"%"}}/></div><p className="ai-answer-text">{answer.answer}</p><div className="citation-block"><div className="eyebrow">CITATIONS</div>{answer.citations?.map((c:any,i:number)=><button className="citation-card" key={i} onClick={()=>openFile(c.file_id)}><FileText size={13}/><span><b>{c.file_name}</b><small>{c.source_ref}</small></span></button>)}</div></>:<div className="dashboard-ai-empty"><BrainCircuit size={24}/><b>Ask your corpus</b><span>DeepSearch retrieves evidence, then Groq explains only what those chunks support.</span></div>}
           </aside>
         </div>
       </section>
     </main>
 
-    <footer className="site-footer workspace-footer"><span>DeepSearch · Private file intelligence</span><span>Hybrid retrieval · OCR · Groq</span></footer>
-
     <AnimatePresence>{selectedFile&&<motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setSelectedFile(null)}><motion.aside className="evidence-drawer" initial={{x:70}} animate={{x:0}} exit={{x:70}} onClick={e=>e.stopPropagation()}><div className="drawer-head"><div><div className="eyebrow">SOURCE INSPECTOR</div><h3>{selectedFile.name}</h3></div><button className="icon-button" onClick={()=>setSelectedFile(null)}><X size={17}/></button></div><div className="drawer-meta"><span>{selectedFile.status}</span><span>{selectedFile.chunk_count} chunks</span><span>{selectedFile.ocr_used?"OCR":"Text extracted"}</span></div><div className="source-list">{selectedChunks.map((c:any,i:number)=><div className="source-block" key={c.id}><div className="source-label"><span>{String(i+1).padStart(2,"0")}</span><b>{c.source_ref}</b></div><p>{c.content}</p></div>)}</div><button className="delete-file" onClick={removeFile}><Trash2 size={15}/> Delete file</button></motion.aside></motion.div>}</AnimatePresence>
   </div>;
 }
+
+
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
 function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(path==="/dashboard"&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
-  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password"||path==="/reset-password")return <ForgotPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;return <AboutPage/>}
+  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/check-email")return <CheckEmailPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password")return <ForgotPasswordPage/>;if(path==="/verify-reset")return <VerifyResetPage/>;if(path==="/reset-password")return <ResetPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;return <HomePage/>}
 createRoot(document.getElementById("root")!).render(<App/>);
