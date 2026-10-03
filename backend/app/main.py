@@ -156,6 +156,11 @@ def health():
             "llm_provider": "groq",
             "llm_model": settings.groq_model,
             "email_provider": settings.email_provider,
+            "email_configured": bool(
+                settings.email_provider == "brevo"
+                and settings.brevo_api_key
+                and settings.brevo_sender_email
+            ),
             "otp": "email_otp_10m_5_attempts",
         },
     }
