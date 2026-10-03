@@ -45,12 +45,23 @@ def send_email(recipient: str, subject: str, text: str) -> bool:
             timeout=settings.email_timeout_seconds,
         )
         if 200 <= response.status_code < 300:
+            message_id = ""
+            try:
+                message_id = response.json().get("messageId", "")
+            except Exception:
+                pass
+            logger.info(
+                "Brevo email accepted recipient=%s message_id=%s",
+                recipient,
+                message_id,
+            )
             return True
 
         logger.error(
-            "Brevo email failed status=%s body=%s",
+            "Brevo email rejected recipient=%s status=%s body=%s",
+            recipient,
             response.status_code,
-            response.text[:500],
+            response.text[:1000],
         )
         return False
     except Exception:
