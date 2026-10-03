@@ -1331,3 +1331,5 @@
   .dashboard-result-card p{font-size:12px}
   .ai-answer-text{font-size:15px}
 }
+
+.ingest-live-status{display:flex;align-items:center;gap:10px;margin-top:12px;padding:12px 14px;border:1px solid #263a60;border-radius:13px;background:#08111f;color:#9db0d8;box-shadow:0 14px 40px rgba(35,52,105,.14)}.ingest-live-status svg{color:#91a5ff;animation:liveStatusPulse 1.3s ease-in-out infinite}.ingest-live-status b,.ingest-live-status span{display:block}.ingest-live-status b{font-size:10px;color:#d2dcf1}.ingest-live-status span{font-size:8px;color:#657693;margin-top:3px}@keyframes liveStatusPulse{0%,100%{opacity:.55;transform:scale(.9)}50%{opacity:1;transform:scale(1.05)}}
