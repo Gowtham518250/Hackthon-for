@@ -236,7 +236,64 @@ function AnimatedHowItWorks(){
     <div className="pipeline-caption"><div><span>INPUT</span><b>document data</b></div><ArrowRight size={14}/><div><span>PROCESSING</span><b>extract → chunk → index</b></div><ArrowRight size={14}/><div><span>OUTPUT</span><b>ranked evidence → answer</b></div></div>
   </div>;
 }
-function HomePage(){
+function DeepDiveSection(){
+  const[active,setActive]=useState(0);
+  const phases=[
+    {eyebrow:"01 · INGEST",title:"Every file becomes machine-readable",copy:"We normalize PDFs, Word, Excel, CSV and images into structured evidence while preserving pages, sheets, tables and OCR provenance.",icon:<Upload size={19}/>,items:["PDF / DOCX / XLSX / CSV / IMAGE","OCR when text is embedded in scans","Page + sheet + source references"]},
+    {eyebrow:"02 · RETRIEVE",title:"Meaning + keywords work together",copy:"A query is evaluated through semantic similarity, lexical matching, exact signals and structured metadata, then reranked before the answer layer sees anything.",icon:<Search size={19}/>,items:["Embeddings + vector similarity","Lexical / BM25-style signals","Exact matches + reranking"]},
+    {eyebrow:"03 · EVIDENCE",title:"The answer stays traceable",copy:"Every result exposes the source chunk that earned its rank. Groq receives retrieved evidence, not the whole corpus and not hidden external knowledge.",icon:<FileSearch size={19}/>,items:["Ranked evidence cards","Source page / sheet references","Citation validation + guardrails"]},
+    {eyebrow:"04 · ADAPT",title:"The corpus changes — the answer changes",copy:"Add or remove a document and the retrieval layer updates. The same question can be rerun to show ranking, evidence and relevance changing with the corpus.",icon:<Activity size={19}/>,items:["Live corpus changes","Before / after snapshots","Baseline vs DeepSearch metrics"]},
+  ];
+  useEffect(()=>{const t=window.setInterval(()=>setActive(v=>(v+1)%phases.length),4200);return()=>window.clearInterval(t)},[]);
+  const p=phases[active];
+  return <section id="architecture" className="deep-dive-section">
+    <div className="deep-dive-head"><div><div className="section-eyebrow">INSIDE DEEPSEARCH</div><h2>See what happens <span>between your file and the answer.</span></h2><p>Built as one connected pipeline — not a collection of disconnected AI features.</p></div><div className="deep-dive-chip"><span className="hero-live-dot"/> LIVE SYSTEM MODEL</div></div>
+    <div className="deep-dive-layout">
+      <div className="deep-dive-nav">{phases.map((x,i)=><button key={x.eyebrow} className={i===active?"active":""} onClick={()=>setActive(i)}><span className="deep-dive-nav-num">{String(i+1).padStart(2,"0")}</span><span><small>{x.eyebrow}</small><b>{x.title.split(" ").slice(0,4).join(" ")}</b></span><ArrowRight size={14}/></button>)}</div>
+      <div className="deep-dive-stage">
+        <div className="deep-dive-stage-top"><motion.div key={active} initial={{opacity:0,x:16}} animate={{opacity:1,x:0}} transition={{duration:.35}}><div className="deep-stage-icon">{p.icon}</div><small>{p.eyebrow}</small><h3>{p.title}</h3><p>{p.copy}</p></motion.div><div className="deep-stage-progress"><span style={{width:((active+1)*25)+"%"}}/></div></div>
+        <div className="deep-dive-visual"><div className="deep-dive-grid"/><div className="deep-dive-center"><div className="deep-dive-center-orb"><div/><div/><div/></div><span>{active===0?"RAW FILE":active===1?"QUERY":active===2?"EVIDENCE":"NEW INPUT"}</span><b>{active===0?"document.pdf":active===1?"find the relevant answer":active===2?"3 ranked chunks":"corpus changed"}</b></div>{Array.from({length:8}).map((_,i)=><motion.i key={i} className={"deep-data-node n"+i} animate={{opacity:[.25,.9,.25],scale:[.8,1,.8],y:[0,(i%2?7:-7),0]}} transition={{duration:2.2+(i%3)*.3,repeat:Infinity,delay:i*.12}}>{i%3===0?<FileText size={13}/>:i%3===1?<Network size={13}/>:<Sparkles size={13}/>}</motion.i>)}<motion.div className="deep-data-beam" animate={{rotate:[0,360]}} transition={{duration:10,repeat:Infinity,ease:"linear"}}/></div>
+        <div className="deep-dive-points">{p.items.map((item,i)=><motion.div key={item} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} transition={{delay:i*.08}}><CircleCheck size={13}/><span>{item}</span></motion.div>)}</div>
+      </div>
+    </div>
+  </section>;
+}
+
+function EvidenceStorySection(){
+  const[mode,setMode]=useState<"question"|"retrieval"|"answer">("question");
+  const steps=[
+    {id:"question",label:"QUESTION",title:"Ask naturally",text:"What are the hard graph problems in this file?",icon:<MessageCircle size={18}/>},
+    {id:"retrieval",label:"RETRIEVAL",title:"Rank the evidence",text:"Semantic + lexical + structured metadata → reranked chunks",icon:<Network size={18}/>},
+    {id:"answer",label:"ANSWER",title:"Generate from evidence",text:"Groq sees the retrieved chunks and returns a cited answer.",icon:<Sparkles size={18}/>},
+  ];
+  const current=steps.find(x=>x.id===mode)!;
+  return <section className="evidence-story-section">
+    <div className="section-head-center"><div className="section-eyebrow">EVIDENCE-FIRST AI</div><h2>Do not just trust the answer. Inspect the path to it.</h2><p>The interface makes retrieval, ranking and grounding visible to the judge.</p></div>
+    <div className="evidence-story-shell">
+      <div className="evidence-story-tabs">{steps.map((x)=><button key={x.id} className={mode===x.id?"active":""} onClick={()=>setMode(x.id)}>{x.icon}<span>{x.label}</span></button>)}</div>
+      <AnimatePresence mode="wait"><motion.div key={mode} className="evidence-story-content" initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-10}} transition={{duration:.3}}>
+        <div className="evidence-story-copy"><span>{current.label}</span><h3>{current.title}</h3><p>{current.text}</p></div>
+        {mode==="question"&&<div className="evidence-mock question-mock"><div className="mock-label">NATURAL LANGUAGE</div><div className="mock-query">What are the hard graph problems in this file?<Search size={15}/></div><div className="mock-hints"><span>difficulty: Hard</span><span>pattern: Graph</span><span>scope: current file</span></div></div>}
+        {mode==="retrieval"&&<div className="evidence-mock retrieval-mock">{["Word Ladder · Hard · BFS","Course Schedule · Medium · Topological Sort","Number of Islands · Medium · DFS/BFS"].map((x,i)=><div key={x}><b>{String(i+1).padStart(2,"0")}</b><span>{x}</span><strong>{i===0?"96%":i===1?"82%":"76%"}</strong></div>)}<div className="rerank-line"><span>semantic</span><i/><span>lexical</span><i/><span>rerank</span></div></div>}
+        {mode==="answer"&&<div className="evidence-mock answer-mock"><div className="mock-answer-top"><Sparkles size={15}/><span>GROUNDED ANSWER</span><b>3 citations</b></div><p>Word Ladder is the hard graph problem surfaced by the retrieved evidence. The result is supported by the problem's difficulty and BFS metadata.</p><div className="mock-citations"><span>page 11</span><span>chunk 83</span><span>Word Ladder</span></div></div>}
+      </motion.div></AnimatePresence>
+    </div>
+  </section>;
+}
+
+function JudgeProofSection(){
+  return <section className="judge-proof-section">
+    <div className="section-head-center"><div className="section-eyebrow">WHY THIS IS MORE THAN A CHAT BOX</div><h2>Designed to prove the intelligence.</h2><p>Every important claim in the product has a visible mechanism behind it.</p></div>
+    <div className="proof-grid">
+      <article><div className="proof-number">01</div><ShieldCheck size={18}/><h3>Grounded by design</h3><p>Evidence is supplied to the generation layer; citations are validated before the answer reaches the user.</p><span>GROUNDING + GUARDRAILS</span></article>
+      <article><div className="proof-number">02</div><Activity size={18}/><h3>Adapts live</h3><p>Corpus changes can be captured as before/after states so the judge can watch retrieval react to new inputs.</p><span>LIVE ADAPTATION</span></article>
+      <article><div className="proof-number">03</div><BarChart3 size={18}/><h3>Measured against baseline</h3><p>Keyword-only retrieval is used as a simple baseline for corpus-local Precision@5, Recall@5, MRR and NDCG.</p><span>ROUND 3 PROOF</span></article>
+      <article><div className="proof-number">04</div><LockKeyhole size={18}/><h3>Private corpus boundary</h3><p>File-scoped chat restricts retrieval to a selected document; common chat searches the full private workspace.</p><span>SCOPED RETRIEVAL</span></article>
+    </div>
+  </section>;
+}
+
+
   const[scrollProgress,setScrollProgress]=useState(0);
   useEffect(()=>{
     const onScroll=()=>{
@@ -324,6 +381,9 @@ function HomePage(){
         <div className="section-head-center"><div className="section-eyebrow">HOW IT WORKS</div><h2>Search first. Generate second.</h2><p>The system retrieves evidence before Groq writes an answer.</p></div>
         <AnimatedHowItWorks/>
       </section>
+      <DeepDiveSection/>
+      <EvidenceStorySection/>
+      <JudgeProofSection/>
 
       <section id="use-cases" className="use-case-section">
         <div className="section-eyebrow">USE CASES</div><h2>Built for questions buried inside files.</h2>
