@@ -222,7 +222,9 @@ async def ai_answer(b: AIAnswerRequest, request: Request, u=Depends(user)):
             "query": query,
             "answer": answer,
             "evidence_count": len(results),
-            "model_access": bool(settings.openai_api_key),
+            "model_access": bool(settings.groq_api_key),
+            "provider": "groq",
+            "model": settings.groq_model,
         }
     except GuardrailViolation as exc:
         logger.warning("AI request blocked [%s]: %s", exc.code, exc)
