@@ -166,13 +166,35 @@ def register(b: Register, request: Request):
     rate_limit(request, "register", 10)
     email = b.email.lower().strip()
 
-    if one("SELECT id FROM users WHERE email=?", (email,)):
-        raise HTTPException(409, "This email is already registered. Please sign in.")
+    existing = one(
+        "SELECT * FROM users WHERE email=?",
+        (email,),
+    )
+
+    if existing:
+        if bool(existing.get("is_verified", 0)):
+            raise HTTPException(
+                409,
+                "This email is already registered. Please sign in.",
+            )
+
+        # A previous registration may have created an unverified account.
+        # Reuse it and issue a fresh verification OTP rather than trapping
+        # the user behind an "email already exists" error.
+        _create_and_send_otp(
+            existing["id"],
+            email,
+            "EMAIL_VERIFICATION",
+        )
+        return {
+            "message": "Your account already exists but is not verified. A fresh verification OTP has been sent.",
+            "verification_required": True,
+            "email": email,
+            "redirect": "/check-email",
+        }
 
     uid = str(uuid.uuid4())
-    # Match the simple Retail Mind-style registration flow: account is created
-    # and the user receives an access token immediately. OTP is used for the
-    # sensitive password-reset flow.
+
     exe(
         "INSERT INTO users VALUES(?,?,?,?,?,?)",
         (
@@ -180,27 +202,31 @@ def register(b: Register, request: Request):
             email,
             b.full_name.strip(),
             hash_password(b.password),
-            1,
+            0,
             now(),
         ),
     )
 
-    access, _, _ = create_token(
-        uid,
-        "access",
-        timedelta(minutes=settings.access_minutes),
-    )
+    try:
+        _create_and_send_otp(
+            uid,
+            email,
+            "EMAIL_VERIFICATION",
+        )
+    except Exception:
+        # Do not leave an unusable unverified account behind when the
+        # configured email provider is unavailable.
+        try:
+            exe("DELETE FROM users WHERE id=?", (uid,))
+        except Exception:
+            logger.exception("Could not roll back failed registration")
+        raise
 
     return {
-        "message": "Account created successfully.",
-        "access_token": access,
-        "token_type": "bearer",
-        "user": {
-            "id": uid,
-            "email": email,
-            "full_name": b.full_name.strip(),
-        },
-        "redirect": "/dashboard",
+        "message": "Account created. A 6-digit verification OTP has been sent.",
+        "verification_required": True,
+        "email": email,
+        "redirect": "/check-email",
     }
 
 
