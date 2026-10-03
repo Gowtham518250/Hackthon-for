@@ -68,6 +68,17 @@ CREATE TABLE IF NOT EXISTS otp_challenges(
     reset_expires_at TEXT,
     reset_used INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS search_history(
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    query TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    confidence REAL DEFAULT 0,
+    citations TEXT NOT NULL,
+    result_count INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+);
 """
 
 
