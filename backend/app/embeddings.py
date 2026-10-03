@@ -7,12 +7,16 @@ from huggingface_hub import hf_hub_download
 from tokenizers import Tokenizer
 
 MODEL_REPO = os.getenv("EMBEDDING_MODEL_REPO", "Xenova/all-MiniLM-L6-v2")
-MODEL_CACHE = Path(
-    os.getenv(
-        "HF_HOME",
-        str(Path("/tmp") / ".cache" / "huggingface"),
-    )
+# Render Free instances have a writable /tmp but the application directory
+# can be read-only. Always use an explicit writable cache unless a custom
+# cache path is both absolute and outside /app.
+requested_cache = os.getenv(
+    "HF_HOME",
+    str(Path("/tmp") / ".cache" / "huggingface"),
 )
+MODEL_CACHE = Path(requested_cache)
+if not MODEL_CACHE.is_absolute() or str(MODEL_CACHE).startswith("/app"):
+    MODEL_CACHE = Path("/tmp") / ".cache" / "huggingface"
 MODEL_CACHE.mkdir(parents=True, exist_ok=True)
 
 os.environ["HF_HOME"] = str(MODEL_CACHE)
