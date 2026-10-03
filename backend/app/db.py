@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS files(
     ocr_used INTEGER DEFAULT 0,
     page_count INTEGER DEFAULT 0,
     chunk_count INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    content_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS chunks(
@@ -170,6 +171,32 @@ def init_db():
                 statement = statement.strip()
                 if statement:
                     cursor.execute(statement)
+
+            # Backward-compatible migration for existing databases created
+            # before content hashing was introduced.
+            if is_postgres():
+                cursor.execute(
+                    """
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_name='files' AND column_name='content_hash'
+                    """
+                )
+                has_hash = cursor.fetchone() is not None
+            else:
+                cursor.execute("PRAGMA table_info(files)")
+                has_hash = any(row[1] == "content_hash" for row in cursor.fetchall())
+
+            if not has_hash:
+                cursor.execute("ALTER TABLE files ADD COLUMN content_hash TEXT")
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                idx_files_user_content_hash
+                ON files(user_id, content_hash)
+                """
+            )
         finally:
             cursor.close()
 
