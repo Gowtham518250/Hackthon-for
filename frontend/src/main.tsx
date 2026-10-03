@@ -1198,7 +1198,10 @@ function UploadFlowPage(){
       {error&&
         <section className='ingest-error'>
           <AlertTriangle size={18}/>
-          <div><b>Indexing failed</b><span>{error}</span></div>
+          <div>
+            <b>{String(error).startsWith('Duplicate file:') ? 'Duplicate file' : 'Indexing failed'}</b>
+            <span>{error}</span>
+          </div>
           <button onClick={()=>navigate('/dashboard')}>Back to dashboard</button>
         </section>
       }

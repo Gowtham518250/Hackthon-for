@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 import logging
 import re
 import time
@@ -849,6 +850,65 @@ def _process_upload_job(
         )
 
 
+def _find_duplicate_file(
+    user_id: str,
+    content_hash: str,
+    extension: str,
+):
+    existing = one(
+        """
+        SELECT id, name, status, created_at
+        FROM files
+        WHERE user_id=? AND content_hash=?
+        LIMIT 1
+        """,
+        (user_id, content_hash),
+    )
+    if existing:
+        return existing
+
+    # Hash legacy PDFs that were uploaded before content_hash was introduced.
+    # This keeps the new duplicate protection effective after deployment.
+    if extension != ".pdf":
+        return None
+
+    legacy = all_(
+        """
+        SELECT id, name, status, created_at, path
+        FROM files
+        WHERE user_id=?
+          AND LOWER(name) LIKE '%.pdf'
+          AND (content_hash IS NULL OR content_hash='')
+        ORDER BY created_at ASC
+        """,
+        (user_id,),
+    )
+
+    for row in legacy:
+        try:
+            with tempfile.TemporaryDirectory(prefix="deepsearch-dedupe-") as tmp:
+                destination = Path(tmp) / f"{row['id']}.pdf"
+                storage.download_file(row["path"], destination)
+                legacy_hash = hashlib.sha256(destination.read_bytes()).hexdigest()
+
+            exe(
+                "UPDATE files SET content_hash=? WHERE id=? AND user_id=?",
+                (legacy_hash, row["id"], user_id),
+            )
+
+            if legacy_hash == content_hash:
+                return {**row, "content_hash": legacy_hash}
+        except Exception:
+            logger.warning(
+                "Could not hash legacy file id=%s name=%s during duplicate check",
+                row["id"],
+                row["name"],
+                exc_info=True,
+            )
+
+    return None
+
+
 @app.post("/api/files/upload")
 async def upload(
     request: Request,
@@ -860,6 +920,8 @@ async def upload(
 
     uploaded_uri = ""
     dest: Path | None = None
+    ext = ""
+    content_hash = ""
     try:
         safe_name = validate_upload(file.filename or "", 1)
         raw = await file.read(MAX_UPLOAD_BYTES + 1)
@@ -872,6 +934,27 @@ async def upload(
             )
 
         ext = Path(safe_name).suffix.lower()
+        content_hash = hashlib.sha256(raw).hexdigest()
+
+        # Exact-content deduplication is intentionally scoped to each user's
+        # private workspace. A file with a different name but identical bytes
+        # is still the same upload.
+        existing = _find_duplicate_file(
+            u["id"],
+            content_hash,
+            ext,
+        )
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Duplicate file: this file is already uploaded as "
+                    f"'{existing['name']}' "
+                    f"(status: {existing['status']}, id: {existing['id']}). "
+                    "Use the existing file instead of uploading it again."
+                ),
+            )
+
         fid = str(uuid.uuid4())
         job_id = str(uuid.uuid4())
         mime_type = file.content_type or "application/octet-stream"
@@ -890,7 +973,12 @@ async def upload(
 
         created_at = now()
         exe(
-            "INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?)",
+            """
+            INSERT INTO files
+                (id,user_id,name,mime_type,path,status,ocr_used,page_count,
+                 chunk_count,created_at,content_hash)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
             (
                 fid,
                 u["id"],
@@ -902,6 +990,7 @@ async def upload(
                 0,
                 0,
                 created_at,
+                content_hash,
             ),
         )
         exe(
@@ -947,6 +1036,10 @@ async def upload(
             "queue": "redis" if queued else "background-fallback",
         }
 
+    except HTTPException:
+        if uploaded_uri:
+            storage.delete(uploaded_uri)
+        raise
     except GuardrailViolation as exc:
         if uploaded_uri:
             storage.delete(uploaded_uri)
@@ -955,6 +1048,31 @@ async def upload(
     except Exception as exc:
         if uploaded_uri:
             storage.delete(uploaded_uri)
+
+        # Protect against the small race where two identical uploads arrive
+        # at the same time and the database unique index wins the race.
+        message = str(exc).lower()
+        if content_hash and (
+            "duplicate key value" in message
+            or "unique constraint" in message
+            or "content_hash" in message
+        ):
+            duplicate = _find_duplicate_file(
+                u["id"],
+                content_hash,
+                ext,
+            )
+            if duplicate:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Duplicate file: this file is already uploaded as "
+                        f"'{duplicate['name']}' "
+                        f"(status: {duplicate['status']}, id: {duplicate['id']}). "
+                        "Use the existing file instead of uploading it again."
+                    ),
+                ) from exc
+
         logger.exception("Upload request failed")
         raise HTTPException(500, "The file could not be uploaded right now.") from exc
     finally:
