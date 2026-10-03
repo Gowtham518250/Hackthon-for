@@ -2,12 +2,15 @@ services:
   - type: web
     name: deepsearch-api
     runtime: python
+    plan: free
     region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: DATABASE_URL
         sync: false
       - key: REDIS_URL
@@ -27,7 +30,7 @@ services:
       - key: STORAGE_BACKEND
         value: local
       - key: LOCAL_STORAGE_DIR
-        value: /var/data/storage
+        value: /tmp/deepsearch/storage
       - key: UPLOAD_DIR
         value: /tmp/deepsearch
       - key: EMBEDDING_MODEL_REPO
