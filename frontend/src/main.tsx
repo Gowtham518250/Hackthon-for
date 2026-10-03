@@ -327,7 +327,7 @@ function HomePage(){
         <a href="#use-cases" onClick={(e)=>{e.preventDefault();scrollToSection("use-cases")}}>Use Cases</a>
         <a href="#pricing" onClick={(e)=>{e.preventDefault();scrollToSection("pricing")}}>Pricing</a>
       </nav>
-      <button className="nav-about" onClick={()=>scrollToSection("about")}>About DeepSearch <ArrowRight size={14}/></button>
+      <button className="nav-about" onClick={()=>navigate("/about")}>About DeepSearch <ArrowRight size={14}/></button>
     </header>
 
     <main>
