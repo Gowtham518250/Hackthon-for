@@ -1,5 +1,6 @@
 import uuid
 import logging
+import re
 import time
 import tempfile
 from collections import defaultdict, deque
@@ -1276,6 +1277,38 @@ async def chat_message(data: ChatMessageRequest, request: Request, u=Depends(use
         20,
         file_ids=[scoped_file_id] if scoped_file_id else None,
     )
+
+    if not results and scoped_file_id and re.search(
+        r"\b(what (?:is|does) (?:this|the) (?:file|document|pdf|sheet)|what.?s (?:this|the) (?:file|document|pdf|sheet)|summar(?:ize|ise)|overview)\b",
+        query,
+        re.I,
+    ):
+        fallback_rows = all_(
+            """
+            SELECT c.*, f.name
+            FROM chunks c JOIN files f ON f.id=c.file_id
+            WHERE c.user_id=? AND c.file_id=?
+            ORDER BY c.id
+            LIMIT 12
+            """,
+            (u["id"], scoped_file_id),
+        )
+        results = [
+            {
+                "score": 0.5,
+                "file_id": row["file_id"],
+                "file_name": row["name"],
+                "chunk_id": row["id"],
+                "content": row["content"][:1100],
+                "source_ref": row["source_ref"],
+                "metadata": jl(row.get("metadata") or "{}", {}),
+                "retrieval": "file-scoped-summary-fallback",
+                "match_reasons": ["file-scoped overview"],
+                "signals": {"semantic": 0.0, "lexical": 0.0, "exact": 0.5},
+            }
+            for row in fallback_rows
+        ]
+
     answer = await answer_with_guardrails(query, results[:12])
 
     exe(
