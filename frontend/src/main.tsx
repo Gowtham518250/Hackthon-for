@@ -730,7 +730,7 @@ function Dashboard(){
         <div id="recent-files" className="panel-box">
           <div className="panel-heading"><div><b>Recent Files</b><span>Your latest indexed documents</span></div><button onClick={scrollFiles}>View all →</button></div>
           <div className="recent-file-list">
-            {recentFiles.length?recentFiles.map(f=><button key={f.id} onClick={()=>openFile(f.id)} className="recent-file-row"><div className="recent-file-icon">{iconFor(f.mime_type||"")}</div><div><b>{f.name}</b><small>{f.mime_type||"file"} · {f.chunk_count} chunks</small></div><ChevronRight size={14}/></button>):<div className="dashboard-empty"><FileSearch size={24}/><b>No files yet</b><span>Upload your first document.</span></div>}
+            {recentFiles.length?recentFiles.map(f=><div key={f.id} className="recent-file-row-wrap"><button onClick={()=>openFile(f.id)} className="recent-file-row"><div className="recent-file-icon">{iconFor(f.mime_type||"")}</div><div><b>{f.name}</b><small>{f.mime_type||"file"} · {f.chunk_count} chunks</small></div><ChevronRight size={14}/></button><button className="recent-file-chat" onClick={()=>navigate("/chat?file="+encodeURIComponent(f.id))}><MessageCircle size={14}/><span>Chat</span></button></div>):<div className="dashboard-empty"><FileSearch size={24}/><b>No files yet</b><span>Upload your first document.</span></div>}
           </div>
         </div>
 
@@ -740,7 +740,7 @@ function Dashboard(){
             <label className="quick-action blue"><Upload size={18}/><b>Upload Files</b><small>Index documents</small><input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={beginUpload}/></label>
             <button className="quick-action purple" onClick={scrollSearch}><Search size={18}/><b>New Search</b><small>Ask DeepSearch</small></button>
             <button className="quick-action green" onClick={scrollFiles}><FileText size={18}/><b>View Corpus</b><small>Browse indexed files</small></button>
-            <button className="quick-action orange" onClick={()=>{setQuery("summarize my indexed files");deepSearch("summarize my indexed files")}}><BrainCircuit size={18}/><b>AI Summary</b><small>Grounded answer</small></button>
+            <button className="quick-action orange" onClick={()=>navigate("/chat")}><MessageCircle size={18}/><b>Common Chat</b><small>Ask across all files</small></button>
           </div>
         </div>
       </section>
@@ -776,7 +776,7 @@ function Dashboard(){
       </section>
     </div>
 
-    <AnimatePresence>{selectedFile&&<motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setSelectedFile(null)}><motion.aside className="evidence-drawer" initial={{x:70}} animate={{x:0}} exit={{x:70}} onClick={e=>e.stopPropagation()}><div className="drawer-head"><div><div className="eyebrow">SOURCE INSPECTOR</div><h3>{selectedFile.name}</h3></div><button className="icon-button" onClick={()=>setSelectedFile(null)}><X size={17}/></button></div><div className="drawer-meta"><span>{selectedFile.status}</span><span>{selectedFile.chunk_count} chunks</span><span>{selectedFile.ocr_used?"OCR":"Text extracted"}</span></div><div className="source-list">{selectedChunks.map((c:any,i:number)=><div className="source-block" key={c.id}><div className="source-label"><span>{String(i+1).padStart(2,"0")}</span><b>{c.source_ref}</b></div><p>{c.content}</p></div>)}</div><button className="reindex-file" onClick={reindexFile} disabled={reindexing}><RefreshCcw size={15} className={reindexing?"spin":""}/>{reindexing?"Re-indexing…":"Re-index file"}</button><button className="delete-file" onClick={removeFile} disabled={reindexing}><Trash2 size={15}/> Delete file</button></motion.aside></motion.div>}</AnimatePresence>
+    <AnimatePresence>{selectedFile&&<motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setSelectedFile(null)}><motion.aside className="evidence-drawer" initial={{x:70}} animate={{x:0}} exit={{x:70}} onClick={e=>e.stopPropagation()}><div className="drawer-head"><div><div className="eyebrow">SOURCE INSPECTOR</div><h3>{selectedFile.name}</h3></div><button className="icon-button" onClick={()=>setSelectedFile(null)}><X size={17}/></button></div><div className="drawer-meta"><span>{selectedFile.status}</span><span>{selectedFile.chunk_count} chunks</span><span>{selectedFile.ocr_used?"OCR":"Text extracted"}</span></div><div className="source-list">{selectedChunks.map((c:any,i:number)=><div className="source-block" key={c.id}><div className="source-label"><span>{String(i+1).padStart(2,"0")}</span><b>{c.source_ref}</b></div><p>{c.content}</p></div>)}</div><button className="chat-from-drawer" onClick={()=>navigate("/chat?file="+encodeURIComponent(selectedFile.id))}><MessageCircle size={15}/> Chat with this file <ArrowRight size={14}/></button><button className="reindex-file" onClick={reindexFile} disabled={reindexing}><RefreshCcw size={15} className={reindexing?"spin":""}/>{reindexing?"Re-indexing…":"Re-index file"}</button><button className="delete-file" onClick={removeFile} disabled={reindexing}><Trash2 size={15}/> Delete file</button></motion.aside></motion.div>}</AnimatePresence>
   </div>;
 }
 
