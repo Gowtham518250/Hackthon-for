@@ -14,6 +14,7 @@ const routes = [
   "history",
   "workspace",
   "ingest",
+  "chat",
   "about",
 ];
 
