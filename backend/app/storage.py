@@ -68,6 +68,30 @@ class ObjectStorage:
         shutil.copy2(path, destination)
         return str(destination)
 
+    def download_file(self, key_or_uri: str, destination: Path) -> Path:
+        """Materialize a persisted original for re-indexing."""
+        destination.parent.mkdir(parents=True, exist_ok=True)
+
+        if self.backend == "s3":
+            prefix = f"s3://{settings.s3_bucket}/"
+            key = (
+                key_or_uri[len(prefix):]
+                if key_or_uri.startswith(prefix)
+                else key_or_uri
+            )
+            self._client.download_file(
+                settings.s3_bucket,
+                key,
+                str(destination),
+            )
+            return destination
+
+        source = Path(key_or_uri)
+        if not source.exists():
+            raise FileNotFoundError("Persisted local file is no longer available.")
+        shutil.copy2(source, destination)
+        return destination
+
     def delete(self, key_or_uri: str) -> None:
         if not key_or_uri:
             return
