@@ -93,6 +93,8 @@ def health():
         "secret_redaction": True,
         "upload_limits": True,
         "rate_limits": True,
+        "llm_provider": "groq",
+        "llm_model": settings.groq_model,
     }}
 
 @app.post("/api/auth/register")
