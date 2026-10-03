@@ -29,7 +29,7 @@ export const api={
     setAuthToken(d.access_token);
     return d;
   },
-  register:(p:any)=>req("/api/auth/register",{method:"POST",body:JSON.stringify(p)}),
+  register:async(p:any)=>{const d=await req("/api/auth/register",{method:"POST",body:JSON.stringify(p)});if(d.access_token)setAuthToken(d.access_token);return d;},
   verifyRegistration:async(p:any)=>{
     const d=await req("/api/auth/verify-registration",{method:"POST",body:JSON.stringify(p)});
     setAuthToken(d.access_token);
