@@ -19,8 +19,32 @@ function App(){
  const load=async()=>{try{const me=await api.me();setUser(me.user);const f=await api.files();setFiles(f.files)}catch{setToken("");sessionStorage.removeItem("deep_token")}};
  useEffect(()=>{if(token)load()},[token]);
  async function auth(e:any){e.preventDefault();setMsg("");try{const d=mode==="login"?await api.login({email,password:pw}):await api.register({full_name:name,email,password:pw});if(d.access_token){sessionStorage.setItem("deep_token",d.access_token);setToken(d.access_token)}else setMsg(d.message||"Account created")}catch(x:any){setMsg(x.message)}}
- async function search(){setLoading(true);setAnswer(null);try{setResults((await api.search(q)).results)}catch(e:any){setMsg(e.message)}finally{setLoading(false)}}
- async function explain(){setAnswerLoading(true);setAnswer(null);try{setAnswer((await api.answer(q)).answer)}catch(e:any){setMsg(e.message)}finally{setAnswerLoading(false)}}
+ async function search(){
+  if(!q.trim())return;
+  setLoading(true);setAnswer(null);setMsg("");
+  try{
+    const d=await api.search(q);
+    setResults(d.results||[]);
+  }catch(e:any){
+    setMsg(`Search failed: ${e.message}`);
+    setResults([]);
+  }finally{
+    setLoading(false);
+  }
+}
+ async function explain(){
+  if(!q.trim())return;
+  setAnswerLoading(true);setAnswer(null);
+  try{
+    const d=await api.answer(q);
+    setAnswer(d.answer||null);
+    if(!d.answer)setMsg("AI returned no grounded answer.");
+  }catch(e:any){
+    setMsg(`AI explanation failed: ${e.message}`);
+  }finally{
+    setAnswerLoading(false);
+  }
+}
  async function upload(e:any){const f=e.target.files?.[0];if(!f)return;setMsg("Indexing "+f.name+"…");try{await api.upload(f);setMsg("Indexed "+f.name);await load()}catch(x:any){setMsg(x.message)}}
  if(!logged)return <div className="landing"><div className="hero3d"><Scene/><div className="overlay"><div className="brand">DEEP<span>SEARCH</span></div><h1>Search everything.<br/><em>Understand anything.</em></h1><p>Deep semantic search across PDFs, Word, Excel, CSV and images—with OCR, ranking, evidence previews and guarded AI explanations.</p></div></div><div className="authCard"><div className="tabs"><button className={mode==="login"?"active":""} onClick={()=>setMode("login")}>Sign in</button><button className={mode==="signup"?"active":""} onClick={()=>setMode("signup")}>Create account</button></div><form onSubmit={auth}>{mode==="signup"&&<input placeholder="Full name" value={name} onChange={e=>setName(e.target.value)} required/>}<input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} required/><input type="password" placeholder="Password" value={pw} onChange={e=>setPw(e.target.value)} required minLength={8}/><button className="primary">{mode==="login"?"Enter DeepSearch":"Create workspace"}</button></form>{msg&&<div className="msg">{msg}</div>}</div></div>;
  return <div className="app"><aside><div className="brand">DEEP<span>SEARCH</span></div><div className="sideStat"><Sparkles/><b>AI File Intelligence</b><small>OCR · Semantic · Ranked</small></div><div className="guardBadge"><LockKeyhole size={15}/><span>AI Guardrails Active</span></div><div className="guardList"><span>✓ Prompt-injection defense</span><span>✓ Grounded citations</span><span>✓ Secret redaction</span><span>✓ Upload limits</span><span>✓ Rate limits</span></div><button className="ghost" onClick={()=>{sessionStorage.removeItem("deep_token");setToken("")}}><LogOut size={16}/> Logout</button></aside>
