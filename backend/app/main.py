@@ -353,6 +353,106 @@ def do_search(b: Query, request: Request, u=Depends(user)):
     }
 
 
+@app.get("/api/corpus/stats")
+def corpus_stats(u=Depends(user)):
+    counts = one(
+        "SELECT COUNT(*) AS files, COALESCE(SUM(chunk_count),0) AS chunks "
+        "FROM files WHERE user_id=?",
+        (u["id"],),
+    )
+    embedded = one(
+        "SELECT COUNT(*) AS embedded_chunks FROM chunks "
+        "WHERE user_id=? AND embedding IS NOT NULL",
+        (u["id"],),
+    )
+    return {
+        "files": int(counts["files"] or 0),
+        "chunks": int(counts["chunks"] or 0),
+        "embedded_chunks": int(embedded["embedded_chunks"] or 0),
+        "semantic_ready": int(embedded["embedded_chunks"] or 0) > 0,
+    }
+
+
+@app.get("/api/files/{file_id}")
+def file_detail(file_id: str, u=Depends(user)):
+    row = one(
+        "SELECT id,name,mime_type,status,ocr_used,page_count,chunk_count,created_at "
+        "FROM files WHERE id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+    if not row:
+        raise HTTPException(404, "File not found")
+    return {"file": row}
+
+
+@app.get("/api/files/{file_id}/chunks")
+def file_chunks(file_id: str, limit: int = 50, u=Depends(user)):
+    limit = max(1, min(limit, 100))
+    exists = one(
+        "SELECT id FROM files WHERE id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+    if not exists:
+        raise HTTPException(404, "File not found")
+    rows = all_(
+        "SELECT id,content,source_ref,metadata FROM chunks "
+        "WHERE file_id=? AND user_id=? ORDER BY id LIMIT ?",
+        (file_id, u["id"], limit),
+    )
+    for row in rows:
+        row["metadata"] = jl(row["metadata"], {})
+    return {"file_id": file_id, "chunks": rows}
+
+
+@app.delete("/api/files/{file_id}")
+def delete_file(file_id: str, u=Depends(user)):
+    row = one(
+        "SELECT id,path FROM files WHERE id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+    if not row:
+        raise HTTPException(404, "File not found")
+
+    try:
+        storage.delete(row["path"])
+    except Exception:
+        logger.warning("Could not remove stored original for %s", file_id)
+
+    exe(
+        "DELETE FROM chunks WHERE file_id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+    exe(
+        "DELETE FROM files WHERE id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+
+    from .vector_index import rebuild_user_index
+    rebuild_user_index(u["id"])
+    bump_search_version(u["id"])
+    return {"success": True, "file_id": file_id}
+
+
+@app.post("/api/deep-search")
+async def deep_search(b: AIAnswerRequest, request: Request, u=Depends(user)):
+    rate_limit(request, "deep_search", 20)
+    query = guard_ai_query(b.query)
+    results = search(u["id"], query, min(b.limit, 20))
+    answer = await answer_with_guardrails(query, results)
+    return {
+        "query": query,
+        "results": results,
+        "answer": answer,
+        "result_count": len(results),
+        "engine": {
+            "retrieval": "hybrid-semantic-lexical-reranked",
+            "generation": "groq",
+            "grounding": True,
+            "citations": True,
+        },
+    }
+
+
 @app.post("/api/ai/answer")
 async def ai_answer(b: AIAnswerRequest, request: Request, u=Depends(user)):
     rate_limit(request, "ai", 20)
