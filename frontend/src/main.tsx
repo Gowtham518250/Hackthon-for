@@ -348,29 +348,105 @@ function ForgotPasswordPage(){
 }
 function footerNav(prefix:string,label:string,path:string){return <p className="switch-text">{prefix} <button className="link-button" onClick={()=>navigate(path)}>{label}</button></p>}
 
+function WorkspaceUniverse({files}:{files:FileRecord[]}){
+  const labels=(files.length?files.slice(0,5):[
+    {name:"report.pdf"} as FileRecord,
+    {name:"brief.docx"} as FileRecord,
+    {name:"sales.xlsx"} as FileRecord,
+    {name:"archive.csv"} as FileRecord,
+    {name:"scan.png"} as FileRecord
+  ]);
+  return <div className="workspace-universe">
+    <Canvas camera={{position:[0,0,7.6],fov:42}} dpr={[1,1.5]}>
+      <ambientLight intensity={.6}/>
+      <pointLight position={[3,4,6]} intensity={17} color="#8291ff"/>
+      <pointLight position={[-4,-1,3]} intensity={8} color="#b36cff"/>
+      <Stars radius={36} depth={20} count={720} factor={1.7} saturation={0} fade/>
+      <ThreeSparkles count={110} scale={[11,7,8]} size={1.35} speed={.24} color="#9aaaff"/>
+      <Float speed={.5} floatIntensity={.15}><DataGlobe/></Float>
+    </Canvas>
+    <div className="workspace-search-glass">
+      <div className="search-glass-line"><Search size={19}/><span>Ask anything in your corpus...</span></div>
+      <div className="workspace-type-row">
+        <span>PDF</span><span>DOCX</span><span>XLSX</span><span>CSV</span><span>Images</span>
+      </div>
+    </div>
+    {labels.map((f,i)=><motion.div key={i} className={"workspace-doc wd-"+i} animate={{y:[0,i%2?9:-9,0],rotateZ:[i%2?-3:3,0,i%2?-3:3]}} transition={{duration:4.5+i*.35,repeat:Infinity,ease:"easeInOut",delay:i*.18}}>
+      {iconFor(f.mime_type||"")}<div><b>{f.name}</b><small>{i===0?"source evidence":i===1?"semantic match":"indexed document"}</small></div>
+    </motion.div>)}
+  </div>;
+}
+
 function Dashboard(){
-  const[user,setUser]=useState<any>(null);const[files,setFiles]=useState<FileRecord[]>([]);const[results,setResults]=useState<Result[]>([]);const[answer,setAnswer]=useState<AIAnswer|null>(null);const[stats,setStats]=useState<any>({files:0,chunks:0,embedded_chunks:0});const[selectedFile,setSelectedFile]=useState<any>(null);const[selectedChunks,setSelectedChunks]=useState<any[]>([]);const[query,setQuery]=useState("");const[loading,setLoading]=useState(false);const[uploading,setUploading]=useState(false);const[msg,setMsg]=useState("");const[activeView,setActiveView]=useState<"search"|"files">("search");
-  const load=async()=>{try{const[m,f,s]=await Promise.all([api.me(),api.files(),api.stats()]);setUser(m.user);setFiles(f.files||[]);setStats(s)}catch{clearAuthToken();navigate("/login")}};useEffect(()=>{load()},[]);
+  const[user,setUser]=useState<any>(null);const[files,setFiles]=useState<FileRecord[]>([]);const[results,setResults]=useState<Result[]>([]);const[answer,setAnswer]=useState<AIAnswer|null>(null);const[stats,setStats]=useState<any>({files:0,chunks:0,embedded_chunks:0});const[selectedFile,setSelectedFile]=useState<any>(null);const[selectedChunks,setSelectedChunks]=useState<any[]>([]);const[query,setQuery]=useState("");const[loading,setLoading]=useState(false);const[uploading,setUploading]=useState(false);const[msg,setMsg]=useState("");
+  const load=async()=>{try{const[m,f,st]=await Promise.all([api.me(),api.files(),api.stats()]);setUser(m.user);setFiles(f.files||[]);setStats(st)}catch{clearAuthToken();navigate("/login")}};
+  useEffect(()=>{load()},[]);
   async function deepSearch(){if(!query.trim())return;setLoading(true);setMsg("");try{const d=await api.deepSearch(query,20);setResults(d.results||[]);setAnswer(d.answer||null)}catch(e:any){setMsg("Deep Search failed: "+e.message)}finally{setLoading(false)}}
   async function upload(e:React.ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];if(!file)return;setUploading(true);setMsg("Indexing "+file.name+"…");try{const d=await api.upload(file);setMsg(d.name+" indexed · "+d.chunks+" chunks · "+d.embedding_chunks+" semantic vectors");await load()}catch(err:any){setMsg("Indexing failed: "+err.message)}finally{setUploading(false);e.target.value=""}}
   async function openFile(id:string){try{const[d,c]=await Promise.all([api.file(id),api.chunks(id)]);setSelectedFile(d.file);setSelectedChunks(c.chunks||[])}catch(e:any){setMsg(e.message)}}
   async function removeFile(){if(!selectedFile)return;try{await api.deleteFile(selectedFile.id);setSelectedFile(null);await load()}catch(e:any){setMsg(e.message)}}
-  return <div className="workspace-shell"><div className="workspace-bg"><CorpusScene files={files} results={results} onSelectFile={openFile}/></div><div className="workspace-vignette"/>
-    <aside className="sidebar-glass"><div><div className="brand-mark small"><span>DEEP</span>SEARCH</div><div className="workspace-label">PRIVATE CORPUS</div></div><div className="sidebar-core"><div className="core-orbit"><span/></div><b>AI FILE INTELLIGENCE</b><small>Semantic · lexical · evidence</small></div>
-      <nav className="sidebar-nav"><button className={activeView==="search"?"active":""} onClick={()=>setActiveView("search")}><Search size={16}/> Deep Search</button><button className={activeView==="files"?"active":""} onClick={()=>setActiveView("files")}><Layers3 size={16}/> Corpus</button></nav>
-      <div className="guard-card"><div className="guard-title"><LockKeyhole size={15}/> AI Guardrails Active</div><span><CircleCheck size={12}/> Prompt-injection defense</span><span><CircleCheck size={12}/> Grounded citations</span><span><CircleCheck size={12}/> Secret redaction</span><span><CircleCheck size={12}/> Upload limits</span></div>
-      <div className="sidebar-user"><div className="avatar">{(user?.full_name||"U").slice(0,1).toUpperCase()}</div><div><b>{user?.full_name||"Workspace user"}</b><small>{user?.email}</small></div></div><button className="logout-button" onClick={()=>{clearAuthToken();navigate("/about")}}><LogOut size={16}/> Logout</button></aside>
-    <main className="dashboard"><header className="topbar"><div><div className="eyebrow">LOCAL CORPUS · LIVE INTELLIGENCE LAYER</div><h2>Good to see you, {user?.full_name?.split(" ")[0]||"there"}.</h2><p>Search across your files. Every answer stays anchored to retrieved evidence.</p></div><label className="upload-button">{uploading?<Activity size={16}/>:<Upload size={16}/>} {uploading?"Indexing…":"Upload file"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload} disabled={uploading}/></label></header>
-      <section className="command-deck"><div className="search-icon-wrap"><Search size={20}/></div><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")deepSearch()}} placeholder='Ask anything — “top 10 difficult DSA questions”'/><button className="gradient-button compact" onClick={deepSearch} disabled={loading}><Sparkles size={15}/>{loading?"Searching…":"Deep Search"}</button></section>
-      {msg&&<div className="message-bar"><AlertTriangle size={15}/>{msg}</div>}
-      <section className="metric-grid"><div className="metric-card"><div className="metric-icon"><Database size={17}/></div><div><b>{stats.files}</b><span>indexed files</span></div></div><div className="metric-card"><div className="metric-icon"><Network size={17}/></div><div><b>{stats.chunks}</b><span>retrieval chunks</span></div></div><div className="metric-card"><div className="metric-icon"><BrainCircuit size={17}/></div><div><b>{stats.embedded_chunks}</b><span>semantic vectors</span></div></div><div className="metric-card accent-card"><div className="metric-icon"><ShieldCheck size={17}/></div><div><b>6</b><span>guardrails</span></div></div></section>
-      <section className="hero-canvas-card"><div className="hero-canvas-copy"><div className="eyebrow">CORPUS UNIVERSE</div><h3>Every file becomes a searchable node.</h3><p>Search results glow in the graph. Click any file to inspect source chunks.</p><div className="mini-status"><span><i className="live-dot"/> Live corpus</span><span>Hybrid retrieval</span><span>Groq grounded AI</span></div></div><div className="hero-canvas"><CorpusScene files={files} results={results} onSelectFile={openFile}/></div></section>
-      <section className="content-grid"><div className="primary-column"><div className="section-heading"><div><div className="eyebrow">EVIDENCE ENGINE</div><h3>{activeView==="files"?"Indexed corpus":"Ranked evidence"}</h3></div><span>{activeView==="files"?files.length+" files":results.length+" matches"}</span></div>{activeView==="files"?<div className="file-grid">{files.length?files.map(f=><button className="file-card" key={f.id} onClick={()=>openFile(f.id)}><div className="file-card-icon">{iconFor(f.mime_type)}</div><div className="file-card-main"><b>{f.name}</b><small>{f.status} · {f.chunk_count} chunks{f.ocr_used?" · OCR":""}</small></div><ChevronRight size={16}/></button>):<div className="empty-state"><FileSearch size={25}/><b>Your corpus is empty.</b><span>Upload a document to begin.</span></div>}</div>:<div className="result-stack">{results.length?results.map((r,i)=><article className="evidence-card" key={r.chunk_id}><div className="rank-badge">{String(i+1).padStart(2,"0")}</div><div className="evidence-body"><div className="evidence-head"><div><b>{r.file_name}</b><small>{r.source_ref}</small></div><span className="score-chip">{Math.round(r.score*100)}%</span></div><p>{r.content}</p><div className="evidence-foot"><div className="reason-row">{(r.match_reasons||[]).slice(0,3).map(x=><span key={x}>{x}</span>)}</div><button className="text-button" onClick={()=>openFile(r.file_id)}>View evidence <ArrowUpRight size={14}/></button></div></div></article>):<div className="empty-state"><Search size={25}/><b>No evidence yet.</b><span>Ask a question against your indexed files.</span></div>}</div>}</div>
-        <aside className="ai-column"><div className="ai-panel"><div className="ai-panel-top"><div className="ai-orb"><Sparkles size={17}/></div><div><div className="eyebrow">GROUNDED AI</div><h3>Final answer</h3></div></div>{answer?<div className="ai-answer-wrap"><div className="confidence-row"><span>Confidence</span><b>{Math.round(answer.confidence)}%</b></div><div className="confidence-bar"><span style={{width:Math.max(0,Math.min(100,answer.confidence))+"%"}}/></div><p className="ai-answer-text">{answer.answer}</p><div className="citation-block"><div className="eyebrow">CITATIONS</div>{answer.citations?.map((c:any,i:number)=><button className="citation-card" key={i} onClick={()=>openFile(c.file_id)}><FileText size={14}/><span><b>{c.file_name}</b><small>{c.source_ref}</small></span><ArrowUpRight size={13}/></button>)}</div></div>:<div className="ai-empty"><BrainCircuit size={28}/><b>Deep Search first.</b><span>Retrieve evidence, then Groq explains only what those chunks support.</span></div>}</div><div className="system-card"><div className="system-head"><Activity size={15}/> SYSTEM STATUS</div><div className="status-row"><span>Retrieval</span><b>Hybrid + metadata</b></div><div className="status-row"><span>Embedding</span><b>MiniLM</b></div><div className="status-row"><span>Generation</span><b>Groq</b></div><div className="status-row"><span>Corpus</span><b>{stats.files} files</b></div></div></aside>
+
+  return <div className="workspace-reference">
+    <header className="workspace-topnav">
+      <button className="brand-mark link-brand" onClick={()=>navigate("/dashboard")}><span>DEEP</span>SEARCH</button>
+      <nav><button className="active" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>Dashboard</button><button onClick={()=>document.getElementById("workspace-results")?.scrollIntoView({behavior:"smooth"})}>Evidence</button><button onClick={()=>document.getElementById("workspace-corpus")?.scrollIntoView({behavior:"smooth"})}>Corpus</button></nav>
+      <div className="workspace-nav-actions">
+        <label className="nav-upload">{uploading?<Activity size={14}/>:<Upload size={14}/>} {uploading?"Indexing…":"Upload"}<input type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.txt,.md" onChange={upload} disabled={uploading}/></label>
+        <button className="workspace-user" onClick={()=>{clearAuthToken();navigate("/about")}}><span>{(user?.full_name||"U").slice(0,1).toUpperCase()}</span>{user?.full_name?.split(" ")[0]||"Account"}</button>
+      </div>
+    </header>
+
+    <main>
+      <section className="workspace-hero">
+        <div className="workspace-copy">
+          <div className="hero-badge"><Sparkles size={13}/> PRIVATE FILE INTELLIGENCE</div>
+          <h1>Search your corpus.<br/><span>Understand the evidence.</span></h1>
+          <p>Welcome back, {user?.full_name?.split(" ")[0]||"there"}. Ask a question and DeepSearch retrieves relevant chunks before Groq explains them.</p>
+          <form className="workspace-command" onSubmit={e=>{e.preventDefault();deepSearch()}}>
+            <Search size={19}/>
+            <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Ask: top 10 hard DSA questions, revenue in Q3..." />
+            <button type="submit" disabled={loading}><Sparkles size={15}/>{loading?"Searching…":"Deep Search"}</button>
+          </form>
+          <div className="workspace-chips">
+            <button onClick={()=>{setQuery("top 10 hard DSA questions");}}>"top 10 hard DSA questions"</button>
+            <button onClick={()=>{setQuery("summarize the project report");}}>"summarize the project report"</button>
+            <button onClick={()=>{setQuery("find revenue in Q3");}}>"find revenue in Q3"</button>
+          </div>
+          {msg&&<div className="message-bar">{msg}</div>}
+          <div className="workspace-stat-row">
+            <div><b>{stats.files}</b><span>indexed files</span></div>
+            <div><b>{stats.chunks}</b><span>retrieval chunks</span></div>
+            <div><b>{stats.embedded_chunks}</b><span>semantic vectors</span></div>
+            <div><b>Groq</b><span>grounded generation</span></div>
+          </div>
+        </div>
+        <WorkspaceUniverse files={files}/>
+      </section>
+
+      <section id="workspace-corpus" className="workspace-flow">
+        <div className="workspace-flow-card"><div className="flow-icon"><Upload size={18}/></div><div><b>1. Ingest</b><span>Upload PDF, Word, Excel, CSV or image.</span></div><ArrowRight size={17}/></div>
+        <div className="workspace-flow-card"><div className="flow-icon"><Network size={18}/></div><div><b>2. Retrieve</b><span>Semantic + lexical ranking finds relevant chunks.</span></div><ArrowRight size={17}/></div>
+        <div className="workspace-flow-card"><div className="flow-icon"><ShieldCheck size={18}/></div><div><b>3. Explain</b><span>Groq answers with validated citations.</span></div></div>
+      </section>
+
+      <section id="workspace-results" className="workspace-results-section">
+        <div className="workspace-section-head"><div><div className="section-eyebrow">EVIDENCE ENGINE</div><h2>Ranked evidence</h2></div><span>{results.length} matches</span></div>
+        <div className="workspace-results-grid">
+          <div className="workspace-result-list">
+            {results.length?results.map((r,i)=><article className="workspace-result" key={r.chunk_id}><div className="workspace-result-rank">{String(i+1).padStart(2,"0")}</div><div><div className="workspace-result-head"><div><b>{r.file_name}</b><small>{r.source_ref}</small></div><strong>{Math.round(r.score*100)}%</strong></div><p>{r.content}</p><div className="reason-row">{(r.match_reasons||[]).slice(0,3).map(x=><span key={x}>{x}</span>)}</div><button className="text-button" onClick={()=>openFile(r.file_id)}>View source <ArrowUpRight size={13}/></button></div></article>):<div className="workspace-empty"><Search size={25}/><b>No evidence yet</b><span>Run Deep Search to populate ranked evidence.</span></div>}
+          </div>
+          <aside className="workspace-ai-card">
+            <div className="ai-panel-top"><div className="ai-orb"><Sparkles size={16}/></div><div><div className="eyebrow">GROUNDED AI</div><h3>Final answer</h3></div></div>
+            {answer?<><div className="workspace-confidence"><span>Confidence</span><b>{Math.round(answer.confidence)}%</b></div><div className="confidence-bar"><span style={{width:Math.max(0,Math.min(100,answer.confidence))+"%"}}/></div><p className="workspace-answer">{answer.answer}</p><div className="citation-block"><div className="eyebrow">CITATIONS</div>{answer.citations?.map((c:any,i:number)=><button key={i} className="citation-card" onClick={()=>openFile(c.file_id)}><FileText size={13}/><span><b>{c.file_name}</b><small>{c.source_ref}</small></span></button>)}</div></>:<div className="workspace-ai-empty"><BrainCircuit size={25}/><b>Ask the corpus.</b><span>Retrieve evidence first, then Groq produces a grounded answer.</span></div>}
+          </aside>
+        </div>
       </section>
     </main>
+
+    <footer className="site-footer workspace-footer"><span>DeepSearch · Private file intelligence</span><span>Hybrid retrieval · OCR · Groq</span></footer>
+
     <AnimatePresence>{selectedFile&&<motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>setSelectedFile(null)}><motion.aside className="evidence-drawer" initial={{x:70}} animate={{x:0}} exit={{x:70}} onClick={e=>e.stopPropagation()}><div className="drawer-head"><div><div className="eyebrow">SOURCE INSPECTOR</div><h3>{selectedFile.name}</h3></div><button className="icon-button" onClick={()=>setSelectedFile(null)}><X size={17}/></button></div><div className="drawer-meta"><span>{selectedFile.status}</span><span>{selectedFile.chunk_count} chunks</span><span>{selectedFile.ocr_used?"OCR":"Text extracted"}</span></div><div className="source-list">{selectedChunks.map((c:any,i:number)=><div className="source-block" key={c.id}><div className="source-label"><span>{String(i+1).padStart(2,"0")}</span><b>{c.source_ref}</b></div><p>{c.content}</p></div>)}</div><button className="delete-file" onClick={removeFile}><Trash2 size={15}/> Delete file</button></motion.aside></motion.div>}</AnimatePresence>
-  </div>
+  </div>;
 }
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
