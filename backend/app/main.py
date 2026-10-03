@@ -877,11 +877,11 @@ def _find_duplicate_file(
         SELECT id, name, status, created_at, path
         FROM files
         WHERE user_id=?
-          AND LOWER(name) LIKE '%.pdf'
+          AND LOWER(name) LIKE ?
           AND (content_hash IS NULL OR content_hash='')
         ORDER BY created_at ASC
         """,
-        (user_id,),
+        (user_id, "%.pdf"),
     )
 
     for row in legacy:
