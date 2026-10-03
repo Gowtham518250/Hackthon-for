@@ -118,6 +118,21 @@ function DataGlobe(){
   </group>;
 }
 
+function HeroTelemetry(){
+  const stages=[
+    {name:'INGEST',value:'01',icon:<Upload size={12}/>},
+    {name:'OCR',value:'02',icon:<ScanText size={12}/>},
+    {name:'CHUNK',value:'03',icon:<Layers3 size={12}/>},
+    {name:'INDEX',value:'04',icon:<Network size={12}/>},
+    {name:'ANSWER',value:'05',icon:<Sparkles size={12}/>},
+  ];
+  return <div className='hero-telemetry'>
+    <div className='hero-telemetry-head'><span className='hero-live-dot'/><span>PROCESSING PIPELINE</span><b>LIVE</b></div>
+    <div className='hero-telemetry-flow'>{stages.map((stage,i)=><React.Fragment key={stage.name}><motion.div className='hero-telemetry-stage' animate={{y:[0,-4,0],opacity:[.55,1,.55]}} transition={{duration:2.2,repeat:Infinity,delay:i*.24,ease:'easeInOut'}}><span>{stage.value}</span><i>{stage.icon}</i><b>{stage.name}</b></motion.div>{i<stages.length-1&&<motion.div className='hero-telemetry-arrow' animate={{opacity:[.2,1,.2],x:[0,4,0]}} transition={{duration:1.4,repeat:Infinity,delay:i*.2}}><ArrowRight size={12}/></motion.div>}</React.Fragment>)}</div>
+    <div className='hero-telemetry-packets'><motion.i animate={{x:['0%','420%']}} transition={{duration:2.9,repeat:Infinity,ease:'linear'}}/><motion.i animate={{x:['0%','420%']}} transition={{duration:2.9,repeat:Infinity,delay:1.05,ease:'linear'}}/><motion.i animate={{x:['0%','420%']}} transition={{duration:2.9,repeat:Infinity,delay:2.05,ease:'linear'}}/></div>
+  </div>;
+}
+
 function HeroUniverse(){
   return <div className="hero-universe">
     <div className="landing-3d-canvas">
@@ -144,6 +159,8 @@ function HeroUniverse(){
         </Float>
       </Canvas>
     </div>
+
+    <HeroTelemetry/>
 
     <form className="hero-search-panel" onSubmit={(e)=>{e.preventDefault();navigate("/register")}}>
       <div className="hero-search-top">
@@ -220,11 +237,23 @@ function AnimatedHowItWorks(){
   </div>;
 }
 function HomePage(){
+  const[scrollProgress,setScrollProgress]=useState(0);
+  useEffect(()=>{
+    const onScroll=()=>{
+      const max=Math.max(1,document.documentElement.scrollHeight-window.innerHeight);
+      setScrollProgress(Math.min(100,Math.max(0,(window.scrollY/max)*100)));
+    };
+    window.addEventListener("scroll",onScroll,{passive:true});
+    onScroll();
+    return()=>window.removeEventListener("scroll",onScroll);
+  },[]);
   return <Layout>
+    <div className="site-scroll-progress"><motion.div animate={{width:scrollProgress+"%"}} transition={{duration:.08}}/></div>
     <div className="site-background">
       <div className="site-glow glow-left"/>
       <div className="site-glow glow-right"/>
       <div className="site-particle-dust"/>
+      <div className="site-data-rain"><i/><i/><i/><i/><i/><i/><i/><i/></div>
     </div>
 
     <header className="site-nav">
@@ -274,21 +303,21 @@ function HomePage(){
       </section>
 
       <section id="capabilities" className="flow-strip">
-        <div className="flow-card">
+        <motion.div className="flow-card" initial={{opacity:0,y:28}} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.35}} transition={{duration:.55}}>
           <div className="flow-num">01</div><div className="flow-icon"><Upload size={19}/></div>
           <div><b>Ingest everything</b><span>Upload files and extract text, tables, pages and OCR content.</span></div>
           <ArrowRight className="flow-arrow" size={18}/>
-        </div>
-        <div className="flow-card">
+        </motion.div>
+        <motion.div className="flow-card" initial={{opacity:0,y:28}} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.35}} transition={{duration:.55,delay:.12}}>
           <div className="flow-num">02</div><div className="flow-icon"><Search size={19}/></div>
           <div><b>Retrieve precisely</b><span>Combine semantic vectors, lexical signals and structured metadata.</span></div>
           <ArrowRight className="flow-arrow" size={18}/>
-        </div>
-        <div className="flow-card">
+        </motion.div>
+        <motion.div className="flow-card" initial={{opacity:0,y:28}} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.35}} transition={{duration:.55,delay:.24}}>
           <div className="flow-num">03</div><div className="flow-icon"><FileSearch size={19}/></div>
           <div><b>See evidence</b><span>Open the exact source chunk behind every ranked result.</span></div>
           <ArrowRight className="flow-arrow" size={18}/>
-        </div>
+        </motion.div>
       </section>
 
       <section id="how-it-works" className="dark-section how-section-new">
