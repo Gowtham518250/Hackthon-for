@@ -79,6 +79,20 @@ CREATE TABLE IF NOT EXISTS search_history(
     result_count INTEGER DEFAULT 0,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS upload_jobs(
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    file_id TEXT,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    progress INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    result TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
