@@ -34,7 +34,7 @@ def _cache_client():
         return None
 
 
-def _cache_key(user_id, query, limit):
+def _cache_key(user_id, query, limit, file_ids=None):
     version = "0"
     client = _cache_client()
     if client:
@@ -42,8 +42,9 @@ def _cache_key(user_id, query, limit):
             version = client.get(f"deepsearch:search:version:{user_id}") or "0"
         except Exception:
             pass
+    scope = ",".join(sorted(str(item) for item in (file_ids or [])))
     digest = hashlib.sha256(
-        f"{user_id}|{version}|{limit}|{query.strip().lower()}".encode("utf-8")
+        f"{user_id}|{version}|{limit}|{scope}|{query.strip().lower()}".encode("utf-8")
     ).hexdigest()
     return f"deepsearch:search:{digest}"
 
@@ -141,13 +142,13 @@ def bump_search_version(user_id):
         pass
 
 
-def search(user_id, query, limit=20):
+def search(user_id, query, limit=20, file_ids=None):
     features = _query_features(query)
     effective_limit = features["requested_count"] or limit
     effective_limit = max(1, min(effective_limit, 50))
 
     client = _cache_client()
-    cache_key = _cache_key(user_id, query, effective_limit)
+    cache_key = _cache_key(user_id, query, effective_limit, file_ids)
 
     if client:
         try:
@@ -162,6 +163,9 @@ def search(user_id, query, limit=20):
         "JOIN files f ON f.id=c.file_id WHERE c.user_id=?",
         (user_id,),
     )
+    if file_ids:
+        allowed = {str(file_id) for file_id in file_ids}
+        rows = [row for row in rows if str(row["file_id"]) in allowed]
     if not rows:
         return []
 
