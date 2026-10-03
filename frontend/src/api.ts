@@ -1,4 +1,4 @@
-export const API=(import.meta as any).env.VITE_API_BASE_URL||"http://localhost:8000";
+export const API=(import.meta as any).env.VITE_API_BASE_URL||"https://deep-search-ai-p8gi.onrender.com";
 let token=sessionStorage.getItem("deep_token")||"";
 
 export function setAuthToken(value:string){
