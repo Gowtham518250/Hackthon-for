@@ -10,8 +10,12 @@ from .db import all_, exe, now
 logger = logging.getLogger("deepsearch.queue")
 
 QUEUE_NAME = "deepsearch:ingestion:jobs"
+PENDING_SET = "deepsearch:ingestion:pending"
 STALE_AFTER_SECONDS = 15 * 60
 RECOVERY_INTERVAL_SECONDS = 30
+REDIS_CONNECT_TIMEOUT_SECONDS = 3
+REDIS_SOCKET_TIMEOUT_SECONDS = 15
+BRPOP_TIMEOUT_SECONDS = 5
 
 _redis = None
 _redis_lock = threading.Lock()
@@ -38,9 +42,12 @@ def _client():
             client = redis.from_url(
                 settings.redis_url,
                 decode_responses=True,
-                socket_connect_timeout=3,
-                socket_timeout=5,
+                socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECONDS,
+                # BRPOP blocks for BRPOP_TIMEOUT_SECONDS. The socket timeout
+                # must be longer than that blocking interval.
+                socket_timeout=REDIS_SOCKET_TIMEOUT_SECONDS,
                 health_check_interval=30,
+                retry_on_timeout=True,
             )
             client.ping()
             _redis = client
@@ -55,16 +62,33 @@ def queue_available() -> bool:
     return _client() is not None
 
 
+def _invalidate_client() -> None:
+    global _redis
+    with _redis_lock:
+        client = _redis
+        _redis = None
+    if client is not None:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+
 def enqueue_job(job_id: str) -> bool:
     client = _client()
     if client is None:
         return False
 
     try:
-        client.rpush(QUEUE_NAME, job_id)
+        # SADD makes enqueue idempotent. Recovery runs periodically, so the
+        # same queued database row is not pushed repeatedly into Redis.
+        added = client.sadd(PENDING_SET, job_id)
+        if added:
+            client.rpush(QUEUE_NAME, job_id)
         return True
     except Exception:
         logger.exception("Could not enqueue ingestion job %s", job_id)
+        _invalidate_client()
         return False
 
 
@@ -205,9 +229,13 @@ def _worker_loop(process_job: Callable[[str], None]) -> None:
             continue
 
         try:
-            item = client.brpop(QUEUE_NAME, timeout=5)
-        except Exception:
-            logger.exception("Redis worker read failed")
+            item = client.brpop(
+                QUEUE_NAME,
+                timeout=BRPOP_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            logger.warning("Redis worker read failed: %s", exc)
+            _invalidate_client()
             time.sleep(2)
             continue
 
@@ -215,6 +243,11 @@ def _worker_loop(process_job: Callable[[str], None]) -> None:
             continue
 
         _, job_id = item
+
+        try:
+            client.srem(PENDING_SET, job_id)
+        except Exception:
+            logger.warning("Could not clear pending marker for job=%s", job_id)
 
         try:
             process_job(job_id)
