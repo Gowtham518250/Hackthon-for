@@ -911,6 +911,63 @@ function EvaluationPage(){
   </div>;
 }
 
+function UploadFlowPage(){
+  const[step,setStep]=useState(0);
+  const[done,setDone]=useState<any>(null);
+  const[error,setError]=useState('');
+  const file=pendingUploadFile;
+  const stages=[
+    {label:'UPLOADED',title:'File received',detail:'Securely accepted into the workspace',icon:<Upload size={19}/>},
+    {label:'EXTRACTED',title:'Content extracted',detail:'Text, pages, tables and OCR are processed',icon:<ScanText size={19}/>},
+    {label:'CHUNKED',title:'Evidence chunks created',detail:'Context-preserving retrieval units',icon:<Layers3 size={19}/>},
+    {label:'INDEXED',title:'Semantic index ready',detail:'Embeddings added to the search index',icon:<Network size={19}/>},
+    {label:'READY',title:'Search ready',detail:'Your file can now be searched and cited',icon:<CircleCheck size={19}/>},
+  ];
+  useEffect(()=>{
+    if(!file){navigate('/dashboard');return}
+    let alive=true;
+    setStep(0);setError('');
+    const timers=[window.setTimeout(()=>alive&&setStep(1),850),window.setTimeout(()=>alive&&setStep(2),1850),window.setTimeout(()=>alive&&setStep(3),3000)];
+    (async()=>{
+      try{const d=await api.upload(file);if(!alive)return;setDone(d);setStep(4);pendingUploadFile=null;}
+      catch(e:any){if(!alive)return;setError(e.message||'Upload failed');setStep(0)}
+    })();
+    return()=>{timers.forEach(window.clearTimeout);alive=false}
+  },[file]);
+  const progress=step/4*100;
+  return <div className='ingest-flow-page'>
+    <header className='ingest-flow-header'><button className='ingest-back' onClick={()=>navigate('/dashboard')}><ArrowRight size={15} style={{transform:'rotate(180deg)'}}/> Dashboard</button><div className='eyebrow'>DEEPSEARCH · LIVE INGESTION</div><span>PRIVATE WORKSPACE</span></header>
+    <main className='ingest-flow-main'>
+      <div className='ingest-flow-hero'><div className='eyebrow'>END-TO-END PROCESSING</div><h1>Turning <span>{file?.name||'your file'}</span> into searchable intelligence.</h1><p>Watch the real ingestion pipeline move from file upload to extraction, chunking, semantic indexing and search-ready evidence.</p></div>
+      <section className='ingest-file-banner'><div className='ingest-file-icon'>{iconFor(file?.type||'')}</div><div><b>{file?.name}</b><small>{file?.type||'document'} · {file?Math.round(file.size/1024):0} KB</small></div><div className='ingest-progress'><div><span>PIPELINE PROGRESS</span><b>{Math.round(progress)}%</b></div><i><em style={{width:progress+'%'}}/></i></div></section>
+      <section className='ingest-visual'>
+        <div className='ingest-grid-glow'/><div className='ingest-flow-line'/><motion.div className='ingest-packet' animate={{left:(8+step*21)+'%',scale:[1,.92,1]}} transition={{duration:.9,ease:'easeInOut'}}><div><FileText size={16}/></div><span/><span/><span/></motion.div>
+        <div className='ingest-stages'>{stages.map((x,i)=><motion.div key={x.label} className={'ingest-stage '+(i<step?'complete ':'')+(i===step?'active':'')} animate={{y:i===step?-8:0}} transition={{duration:.35}}><div className='ingest-stage-icon'>{x.icon}</div><small>{String(i+1).padStart(2,'0')} · {x.label}</small><b>{x.title}</b><p>{x.detail}</p><span className='ingest-stage-status'>{i<step?'COMPLETE':i===step?'PROCESSING':'WAITING'}</span></motion.div>)}</div>
+      </section>
+      {done&&<section className='ingest-result'><div className='ingest-result-head'><CircleCheck size={22}/><div><b>Indexing complete</b><span>{done.name} is ready for DeepSearch.</span></div><button onClick={()=>navigate('/dashboard')}>Search this file <ArrowRight size={14}/></button></div><div className='ingest-stat-grid'><div><span>CHUNKS</span><b>{done.chunks}</b><small>retrieval units</small></div><div><span>SEMANTIC VECTORS</span><b>{done.embedding_chunks}</b><small>indexed embeddings</small></div><div><span>OCR</span><b>{done.performance?.ocr_used?'USED':'NOT NEEDED'}</b><small>text extraction</small></div><div><span>PROCESSING</span><b>{done.performance?.processing_ms||'—'} ms</b><small>end-to-end ingest</small></div></div></section>}
+      {error&&<section className='ingest-error'><AlertTriangle size={18}/><div><b>Indexing failed</b><span>{error}</span></div><button onClick={()=>navigate('/dashboard')}>Back to dashboard</button></section>}
+    </main>
+  </div>;
+}
+
+function HistoryPage(){
+  const[items,setItems]=useState<any[]>([]);const[loading,setLoading]=useState(true);const[msg,setMsg]=useState('');const[open,setOpen]=useState('');const[filter,setFilter]=useState('');
+  async function load(){setLoading(true);try{const d=await api.history();setItems(d.history||[])}catch(e:any){setMsg(e.message)}finally{setLoading(false)}}
+  useEffect(()=>{load()},[]);
+  const shown=items.filter(x=>!filter||x.query.toLowerCase().includes(filter.toLowerCase())||x.answer.toLowerCase().includes(filter.toLowerCase()));
+  async function remove(id:string){try{await api.deleteHistory(id);setItems(v=>v.filter(x=>x.id!==id))}catch(e:any){setMsg(e.message)}}
+  return <div className='history-page'>
+    <header className='history-topbar'><button className='history-back' onClick={()=>navigate('/dashboard')}><ArrowRight size={15} style={{transform:'rotate(180deg)'}}/> Dashboard</button><div><div className='eyebrow'>DEEPSEARCH · HISTORY</div><h1>Search history</h1><p>Every question and grounded answer in your private workspace.</p></div><button className='history-new' onClick={()=>navigate('/dashboard#search')}><Search size={15}/> New search</button></header>
+    <main className='history-main'>
+      <div className='history-toolbar'><div className='history-search'><Search size={16}/><input value={filter} onChange={e=>setFilter(e.target.value)} placeholder='Search questions and answers…'/></div><span>{shown.length} saved searches</span></div>
+      {msg&&<div className='history-message'><AlertTriangle size={14}/>{msg}</div>}
+      {loading?<div className='history-empty'><Activity size={26}/><b>Loading history…</b></div>:shown.length?<div className='history-list'>{shown.map((item,i)=><article className={'history-card '+(open===item.id?'open':'')} key={item.id}>
+        <button className='history-card-main' onClick={()=>setOpen(open===item.id?'':item.id)}><div className='history-number'>{String(shown.length-i).padStart(2,'0')}</div><div><span className='history-date'>{new Date(item.created_at).toLocaleString()}</span><h3>{item.query}</h3><p>{item.answer}</p><div className='history-meta'><span>{item.result_count} evidence results</span><span>{Math.round(item.confidence||0)}% confidence</span><span>{item.citations?.length||0} citations</span></div></div><ChevronRight size={17} className='history-chevron'/></button>
+        {open===item.id&&<div className='history-detail'><div><span className='eyebrow'>GROUNDED ANSWER</span><p>{item.answer}</p></div><div className='history-citations'><span className='eyebrow'>CITATIONS</span>{(item.citations||[]).map((c:any,j:number)=><button key={j} onClick={()=>navigate('/dashboard?file='+encodeURIComponent(c.file_id||''))}><FileText size={14}/><span><b>{c.file_name}</b><small>{c.source_ref}</small></span><ArrowUpRight size={12}/></button>)}</div><button className='history-delete' onClick={()=>remove(item.id)}><Trash2 size={14}/> Remove from history</button></div>}
+      </article>)}</div>:<div className='history-empty'><Search size={30}/><b>No search history yet</b><span>Run a DeepSearch query and its question, answer and citations will appear here.</span><button onClick={()=>navigate('/dashboard')} >Start searching <ArrowRight size={14}/></button></div>}
+    </main>
+  </div>;
+}
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
 function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(["/dashboard","/evaluation"].includes(path)&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
