@@ -50,30 +50,82 @@ function Layout({children,user=false}:{children:React.ReactNode;user?:boolean}){
 }
 
 function AboutPage(){
-  return <Layout><div className="landing-scene"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div><div className="landing-grid"/>
-    <header className="public-nav"><div className="brand-mark"><span>DEEP</span>SEARCH</div><nav><button onClick={()=>navigate("/about")} className="active">About</button><button onClick={()=>navigate("/login")}>Sign in</button><button onClick={()=>navigate("/register")} className="nav-cta">Create account <ArrowUpRight size={14}/></button></nav></header>
-    <main className="about-hero">
-      <section className="about-copy"><div className="eyebrow">PRIVATE FILE INTELLIGENCE · 3D KNOWLEDGE UNIVERSE</div><h1>Search your files.<br/><span>Understand the evidence.</span></h1><p>DeepSearch ingests PDFs, Word documents, spreadsheets and images, retrieves the most relevant evidence, and uses guarded AI to explain what your corpus actually supports.</p>
-      <div className="about-actions"><button className="gradient-button" onClick={()=>navigate("/register")}>Create workspace <ArrowRight size={16}/></button><button className="subtle-button big" onClick={()=>navigate("/login")}>Sign in</button></div>
-      <div className="feature-strip"><span><ScanText size={15}/> OCR ingestion</span><span><Network size={15}/> Semantic retrieval</span><span><ShieldCheck size={15}/> Guarded AI</span></div></section>
-      <section className="about-orbit"><OrbitVisual large/><div className="orbit-label label-a">EXTRACT</div><div className="orbit-label label-b">RETRIEVE</div><div className="orbit-label label-c">EXPLAIN</div></section>
+  return <Layout>
+    <div className="about-space"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div>
+    <div className="about-stars"/>
+    <header className="public-nav">
+      <button className="brand-mark link-brand" onClick={()=>navigate("/about")}><span>DEEP</span>SEARCH</button>
+      <nav>
+        <button onClick={()=>document.getElementById("how-it-works")?.scrollIntoView({behavior:"smooth"})}>How it works</button>
+        <button onClick={()=>document.getElementById("capabilities")?.scrollIntoView({behavior:"smooth"})}>Capabilities</button>
+        <button onClick={()=>navigate("/login")}>Sign in</button>
+        <button onClick={()=>navigate("/register")} className="nav-cta">Create workspace <ArrowUpRight size={14}/></button>
+      </nav>
+    </header>
+
+    <main className="about-main">
+      <section className="about-hero-new">
+        <div className="about-kicker">PRIVATE FILE INTELLIGENCE</div>
+        <h1>Turn your files into<br/><span>a searchable intelligence layer.</span></h1>
+        <p>DeepSearch reads your local corpus, retrieves the most relevant evidence and gives you a grounded answer you can trace back to the exact source.</p>
+        <div className="about-actions">
+          <button className="gradient-button" onClick={()=>navigate("/register")}>Start searching <ArrowRight size={16}/></button>
+          <button className="subtle-button big" onClick={()=>document.getElementById("how-it-works")?.scrollIntoView({behavior:"smooth"})}>See how it works</button>
+        </div>
+
+        <div className="hero-orbit-stage">
+          <OrbitVisual large/>
+          <div className="hero-chip chip-top"><FileText size={14}/><b>PDF</b><span>page-aware</span></div>
+          <div className="hero-chip chip-left"><Network size={14}/><b>SEMANTIC</b><span>vector retrieval</span></div>
+          <div className="hero-chip chip-right"><ScanText size={14}/><b>OCR</b><span>image extraction</span></div>
+          <div className="hero-chip chip-bottom"><ShieldCheck size={14}/><b>GROUNDED AI</b><span>citations enforced</span></div>
+        </div>
+      </section>
+
+      <section id="capabilities" className="capability-row">
+        <div><div className="cap-icon"><ScanText size={16}/></div><b>Ingest everything</b><span>PDF · Word · Excel · CSV · images</span></div>
+        <div><div className="cap-icon"><Network size={16}/></div><b>Retrieve precisely</b><span>semantic + lexical + structured evidence</span></div>
+        <div><div className="cap-icon"><BrainCircuit size={16}/></div><b>Explain safely</b><span>Groq answers only from retrieved chunks</span></div>
+      </section>
+
+      <section id="how-it-works" className="how-section">
+        <div className="section-eyebrow">THE DEEPSEARCH LOOP</div>
+        <h2>Extract. Retrieve. Explain.</h2>
+        <p>Every question follows the same evidence-first path.</p>
+        <div className="loop-grid">
+          <div><span>01</span><h3>Extract</h3><p>Parse text, tables, pages and OCR content into structured source-aware chunks.</p></div>
+          <div><span>02</span><h3>Retrieve</h3><p>Combine semantic vectors with lexical signals and metadata to rank the relevant chunks.</p></div>
+          <div><span>03</span><h3>Explain</h3><p>Groq receives only retrieved evidence and returns a cited, guarded answer.</p></div>
+        </div>
+      </section>
     </main>
-    <section className="about-cards"><div><Database size={18}/><h3>One private corpus</h3><p>Keep your documents behind your authenticated workspace and inspect the exact evidence used for answers.</p></div><div><BrainCircuit size={18}/><h3>Retrieval before generation</h3><p>Relevant chunks are retrieved first. Groq only receives the selected evidence, not your entire corpus.</p></div><div><BookOpen size={18}/><h3>Source-first UX</h3><p>Every answer can lead back to a document, page, sheet or indexed chunk.</p></div></section>
   </Layout>
 }
-
 function AuthShell({title,subtitle,children}:{title:string;subtitle:string;children:React.ReactNode}){
-  return <Layout><div className="auth-bg"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div><div className="auth-grid"/>
-    <header className="auth-nav"><button className="brand-mark link-brand" onClick={()=>navigate("/about")}><span>DEEP</span>SEARCH</button><button className="back-link" onClick={()=>navigate("/about")}>Back to about</button></header>
-    <main className="auth-layout"><section className="auth-visual"><OrbitVisual large/><div className="auth-visual-copy"><div className="eyebrow">PRIVATE WORKSPACE</div><h2>{title}</h2><p>{subtitle}</p><div className="auth-pills"><span>6 guardrails</span><span>FAISS semantic</span><span>Groq grounded AI</span></div></div></section><motion.section className="auth-panel" initial={{opacity:0,y:20}} animate={{opacity:1,y:0}}>{children}{footer}</motion.section></main>
+  return <Layout>
+    <div className="auth-space"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div>
+    <header className="auth-nav">
+      <button className="brand-mark link-brand" onClick={()=>navigate("/about")}><span>DEEP</span>SEARCH</button>
+      <button className="back-link" onClick={()=>navigate("/about")}>About DeepSearch</button>
+    </header>
+    <main className="auth-center-page">
+      <section className="auth-card">
+        <div className="auth-orb"><OrbitVisual/></div>
+        <div className="auth-copy">
+          <div className="auth-kicker">PRIVATE WORKSPACE</div>
+          <h2>{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+        {children}
+      </section>
+    </main>
   </Layout>
 }
-
 function LoginPage(){
   const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
   async function submit(e:React.FormEvent){e.preventDefault();setLoading(true);setMsg("");try{await api.login({email,password});navigate("/dashboard")}catch(err:any){setMsg(err.message)}finally{setLoading(false)}}
   return <AuthShell title="Welcome back" subtitle="Sign in and return to your private document intelligence workspace."><div className="auth-kicker">SIGN IN</div><h1 className="auth-title">Enter DeepSearch</h1><p className="auth-subtitle">Your corpus stays tied to your account.</p>
-    <form className="auth-form" onSubmit={submit}><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required/></label><button className="gradient-button" disabled={loading}>{loading?"Signing in…":"Sign in"}<ArrowRight size={16}/></button></form>{msg&&<div className="alert">{msg}</div>}{footerNav("New here?","Create an account","/register")}</AuthShell>
+    <form className="auth-form" onSubmit={submit}><label>Email<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" required/></label><label><span className="field-label-row">Password<button type="button" className="inline-link" onClick={()=>navigate("/forgot-password")}>Forgot password?</button></span><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required/></label><button className="gradient-button" disabled={loading}>{loading?"Signing in…":"Sign in"}<ArrowRight size={16}/></button></form>{msg&&<div className="alert">{msg}</div>}{footerNav("New here?","Create an account","/register")}</AuthShell>
 }
 function RegisterPage(){
   const[name,setName]=useState("");const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[msg,setMsg]=useState("");const[loading,setLoading]=useState(false);
