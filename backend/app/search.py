@@ -76,6 +76,16 @@ def _minmax(scores: dict[str, float]) -> dict[str, float]:
     }
 
 
+def bump_search_version(user_id):
+    client = _cache_client()
+    if not client:
+        return
+    try:
+        client.incr(f"deepsearch:search:version:{user_id}")
+    except Exception:
+        pass
+
+
 def search(user_id, query, limit=20):
     client = _cache_client()
     key = _cache_key(user_id, query, limit)
