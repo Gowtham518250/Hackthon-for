@@ -184,6 +184,39 @@ function HeroUniverse(){
   </div>;
 }
 
+function AnimatedHowItWorks(){
+  const[step,setStep]=useState(0);
+  useEffect(()=>{const timer=window.setInterval(()=>setStep(v=>(v+1)%5),1800);return()=>window.clearInterval(timer)},[]);
+  const stages=[
+    {label:"INGEST",title:"Receive the file",detail:"PDF · DOCX · XLSX · CSV · IMAGE",icon:<Upload size={17}/>},
+    {label:"EXTRACT",title:"Read & OCR",detail:"Text · tables · pages · OCR",icon:<ScanText size={17}/>},
+    {label:"CHUNK",title:"Break into evidence",detail:"Context-preserving retrieval chunks",icon:<Layers3 size={17}/>},
+    {label:"INDEX",title:"Embed & rank",detail:"Semantic + lexical + reranking",icon:<Network size={17}/>},
+    {label:"ANSWER",title:"Grounded response",detail:"Groq + citations + confidence",icon:<Sparkles size={17}/>},
+  ];
+  return <div className="animated-pipeline">
+    <div className="pipeline-live-bar"><span className="pipeline-live-dot"/><span>LIVE PIPELINE</span><b>{stages[step].label}</b><small>processing your data</small></div>
+    <div className="pipeline-stage-track">
+      <div className="pipeline-track-line"/><div className="pipeline-track-glow"/>
+      {[0,1,2,3,4].map(i=><div key={i} className={'pipeline-node '+(i<=step?'is-done ':'')+(i===step?'is-active':'')} style={{left:(6+i*22)+'%'}}><span>{i<step?'✓':String(i+1).padStart(2,'0')}</span></div>)}
+      <motion.div className="pipeline-data-packet" animate={{left:(6+step*22)+'%',scale:[1,.92,1],opacity:[.85,1,.85]}} transition={{duration:1.35,ease:'easeInOut'}}><div className="packet-core"><FileText size={12}/></div><span className="packet-particle p1"/><span className="packet-particle p2"/><span className="packet-particle p3"/></motion.div>
+      <motion.div className="pipeline-stream stream-one" animate={{x:[0,42,0],opacity:[.15,.8,.15]}} transition={{duration:2,repeat:Infinity,ease:'easeInOut'}}/>
+      <motion.div className="pipeline-stream stream-two" animate={{x:[0,-35,0],opacity:[.12,.65,.12]}} transition={{duration:2.8,repeat:Infinity,ease:'easeInOut',delay:.6}}/>
+    </div>
+    <div className="pipeline-stage-grid">
+      {stages.map((item,i)=><motion.div key={item.label} className={'pipeline-stage-card '+(i===step?'active ':'')+(i<step?'complete':'')} animate={{y:i===step?-6:0,scale:i===step?1.015:1}} transition={{duration:.35,ease:'easeOut'}}>
+        <div className="pipeline-card-top"><span className="pipeline-index">{String(i+1).padStart(2,'0')}</span><div className="pipeline-icon">{item.icon}</div><span className="pipeline-check">{i<step?'✓':''}</span></div>
+        <small>{item.label}</small><b>{item.title}</b><p>{item.detail}</p>
+        {i===0&&<div className="pipeline-mini-file"><FileText size={13}/><span>report.pdf</span><em>1 file</em></div>}
+        {i===1&&<div className="pipeline-mini-lines"><i/><i/><i/><i/></div>}
+        {i===2&&<div className="pipeline-mini-chunks"><span>01</span><span>02</span><span>03</span><span>…</span></div>}
+        {i===3&&<div className="pipeline-mini-vectors">{Array.from({length:9}).map((_,n)=><i key={n}/>)}</div>}
+        {i===4&&<div className="pipeline-mini-answer"><Sparkles size={12}/><span>evidence-backed</span><b>3 citations</b></div>}
+      </motion.div>)}
+    </div>
+    <div className="pipeline-caption"><div><span>INPUT</span><b>document data</b></div><ArrowRight size={14}/><div><span>PROCESSING</span><b>extract → chunk → index</b></div><ArrowRight size={14}/><div><span>OUTPUT</span><b>ranked evidence → answer</b></div></div>
+  </div>;
+}
 function HomePage(){
   return <Layout>
     <div className="site-background">
@@ -258,15 +291,7 @@ function HomePage(){
 
       <section id="how-it-works" className="dark-section how-section-new">
         <div className="section-head-center"><div className="section-eyebrow">HOW IT WORKS</div><h2>Search first. Generate second.</h2><p>The system retrieves evidence before Groq writes an answer.</p></div>
-        <div className="pipeline-visual">
-          <div><span>01</span><Search size={19}/><b>Your question</b><small>Natural language</small></div>
-          <i>→</i>
-          <div><span>02</span><Network size={19}/><b>Relevant chunks</b><small>Semantic + lexical</small></div>
-          <i>→</i>
-          <div><span>03</span><ShieldCheck size={19}/><b>Guarded AI</b><small>Groq + citations</small></div>
-          <i>→</i>
-          <div><span>04</span><FileText size={19}/><b>Final answer</b><small>Traceable evidence</small></div>
-        </div>
+        <AnimatedHowItWorks/>
       </section>
 
       <section id="use-cases" className="use-case-section">
