@@ -929,24 +929,6 @@ def reindex_file(file_id: str, u=Depends(user)):
         raise HTTPException(500, "The file could not be re-indexed right now.") from exc
 
 
-@app.post("/api/files/reindex-all")
-def reindex_all_files(u=Depends(user)):
-    rows = all_(
-        "SELECT id FROM files WHERE user_id=? ORDER BY created_at DESC",
-        (u["id"],),
-    )
-    results = []
-    for item in rows:
-        try:
-            # Call the same endpoint logic through a direct helper-compatible request model
-            # is intentionally avoided; each file is processed through the internal function below.
-            result = _reindex_file_for_user(item["id"], u["id"])
-            results.append(result)
-        except Exception as exc:
-            results.append({"file_id": item["id"], "status": "failed", "error": str(exc)})
-    return {"results": results, "count": len(results)}
-
-
 @app.delete("/api/files/{file_id}")
 def delete_file(file_id: str, u=Depends(user)):
     row = one(
