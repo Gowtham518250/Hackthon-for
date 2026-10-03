@@ -270,25 +270,6 @@
 .card-data{right:2%;top:24%}
 .card-ai{right:7%;bottom:17%}
 .card-ocr{left:7%;bottom:12%}
-.ds-sweep{
-  position:absolute;
-  border:1px solid rgba(113,137,255,.14);
-  border-radius:50%;
-  pointer-events:none;
-  z-index:2;
-}
-.sweep-one{
-  width:290px;height:125px;
-  left:50%;top:50%;
-  transform:translate(-50%,-50%) rotate(-13deg);
-  animation:dsSweep 7s ease-in-out infinite;
-}
-.sweep-two{
-  width:360px;height:185px;
-  left:50%;top:50%;
-  transform:translate(-50%,-50%) rotate(23deg);
-  animation:dsSweep 9s ease-in-out infinite reverse;
-}
 @keyframes dsPulse{
   0%,100%{transform:translate(-50%,-50%) scale(.92);opacity:.65}
   50%{transform:translate(-50%,-50%) scale(1.08);opacity:1}
