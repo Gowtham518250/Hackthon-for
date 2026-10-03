@@ -161,6 +161,18 @@ def health():
                 and settings.brevo_api_key
                 and settings.brevo_sender_email
             ),
+            "email_missing": (
+                [
+                    name
+                    for name, value in (
+                        ("BREVO_API_KEY", settings.brevo_api_key),
+                        ("BREVO_SENDER_EMAIL", settings.brevo_sender_email),
+                    )
+                    if not value
+                ]
+                if settings.email_provider == "brevo"
+                else []
+            ),
             "otp": "email_otp_10m_5_attempts",
         },
     }
