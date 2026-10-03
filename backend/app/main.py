@@ -964,6 +964,25 @@ async def deep_search(b: DeepSearchRequest, request: Request, u=Depends(user)):
     query = guard_ai_query(b.query)
     results = search(u["id"], query, min(b.limit, 20))
     answer = await answer_with_guardrails(query, results[:12])
+
+    exe(
+        """
+        INSERT INTO search_history
+            (id,user_id,query,answer,confidence,citations,result_count,created_at)
+        VALUES(?,?,?,?,?,?,?,?)
+        """,
+        (
+            str(uuid.uuid4()),
+            u["id"],
+            query,
+            str(answer.get("answer") or ""),
+            float(answer.get("confidence") or 0),
+            jd(answer.get("citations") or []),
+            len(results),
+            now(),
+        ),
+    )
+
     return {
         "query": query,
         "results": results,
@@ -976,6 +995,33 @@ async def deep_search(b: DeepSearchRequest, request: Request, u=Depends(user)):
             "citations": True,
         },
     }
+
+
+@app.get("/api/history")
+def get_history(limit: int = 50, u=Depends(user)):
+    limit = max(1, min(limit, 100))
+    rows = all_(
+        """
+        SELECT id,query,answer,confidence,citations,result_count,created_at
+        FROM search_history
+        WHERE user_id=?
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (u["id"], limit),
+    )
+    for row in rows:
+        row["citations"] = jl(row.get("citations") or "[]", [])
+    return {"history": rows}
+
+
+@app.delete("/api/history/{history_id}")
+def delete_history(history_id: str, u=Depends(user)):
+    row = one("SELECT id FROM search_history WHERE id=? AND user_id=?", (history_id, u["id"]))
+    if not row:
+        raise HTTPException(404, "History item not found")
+    exe("DELETE FROM search_history WHERE id=? AND user_id=?", (history_id, u["id"]))
+    return {"success": True, "id": history_id}
 
 
 @app.get("/api/evaluation/benchmark")
