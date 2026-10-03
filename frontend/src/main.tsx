@@ -5,7 +5,7 @@ import{createRoot}from"react-dom/client";
 import{Canvas}from"@react-three/fiber";
 import{Float,OrbitControls,Stars,Text,Line,Sparkles as ThreeSparkles}from"@react-three/drei";
 import{motion,AnimatePresence}from"framer-motion";
-import{Search,Upload,LogOut,FileText,Image as ImageIcon,Sheet,ShieldCheck,Database,Sparkles,LockKeyhole,Trash2,X,BrainCircuit,Network,Layers3,ArrowUpRight,Activity,FileSearch,ScanText,ChevronRight,CircleCheck,AlertTriangle,Mail,ArrowRight,RefreshCcw,BookOpen,KeyRound,FolderOpen}from"lucide-react";
+import{Search,Upload,LogOut,FileText,Image as ImageIcon,Sheet,ShieldCheck,Database,Sparkles,LockKeyhole,Trash2,X,BrainCircuit,Network,Layers3,ArrowUpRight,Activity,FileSearch,ScanText,ChevronRight,CircleCheck,AlertTriangle,Mail,ArrowRight,RefreshCcw,BookOpen,KeyRound,FolderOpen,MessageCircle,Send}from"lucide-react";
 import"./styles.css";
 import{api,clearAuthToken}from"./api";
 
@@ -1107,6 +1107,111 @@ function UploadFlowPage(){
   </div>;
 }
 
+function ChatPage(){
+  const fileId=queryParam("file")||"";
+  const[scope,setScope]=useState<{type:string;file_id:string|null;title:string}>({type:fileId?"file":"common",file_id:fileId||null,title:fileId?"File chat":"All files"});
+  const[thread,setThread]=useState<any>(null);
+  const[messages,setMessages]=useState<any[]>([]);
+  const[input,setInput]=useState("");
+  const[loading,setLoading]=useState(true);
+  const[sending,setSending]=useState(false);
+  const[error,setError]=useState("");
+  const[files,setFiles]=useState<FileRecord[]>([]);
+  const endRef=React.useRef<HTMLDivElement>(null);
+
+  async function loadChat(targetFileId=fileId){
+    setLoading(true);setError("");
+    try{
+      const[d,f]=await Promise.all([api.chats(targetFileId||undefined),api.files()]);
+      setScope(d.scope);
+      setThread(d.thread);
+      setMessages(d.messages||[]);
+      setFiles(f.files||[]);
+    }catch(e:any){
+      if(String(e.message).includes("Authentication")){clearAuthToken();navigate("/login");return}
+      setError(e.message||"Unable to load chat");
+    }finally{setLoading(false)}
+  }
+
+  useEffect(()=>{loadChat(fileId)},[fileId]);
+  useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth"})},[messages,loading]);
+
+  async function send(){
+    const message=input.trim();
+    if(!message||sending)return;
+    setSending(true);setError("");setInput("");
+    setMessages(prev=>[...prev,{role:"user",content:message,citations:[]}]);
+    try{
+      const d=await api.chatMessage(message,thread?.id,fileId||undefined);
+      setThread(d.thread);
+      setScope(d.scope);
+      setMessages(prev=>[...prev,d.message]);
+    }catch(e:any){
+      setError(e.message||"Chat request failed");
+    }finally{setSending(false)}
+  }
+
+  function switchScope(id:string){
+    navigate(id?"/chat?file="+encodeURIComponent(id):"/chat");
+  }
+
+  return <div className="chat-page">
+    <aside className="chat-sidebar">
+      <div className="chat-brand"><span className="brand-glyph">◆</span><b>DEEP<span>SEARCH</span></b></div>
+      <button className="chat-side-new" onClick={()=>switchScope("")}><MessageCircle size={15}/>Common chat</button>
+      <div className="chat-side-label">FILE CHATS</div>
+      <div className="chat-file-list">
+        {files.map(f=><button key={f.id} className={fileId===f.id?"active":""} onClick={()=>switchScope(f.id)}><FileText size={14}/><span>{f.name}</span></button>)}
+      </div>
+      <button className="chat-side-back" onClick={()=>navigate("/dashboard")}><ArrowRight size={14} style={{transform:"rotate(180deg)"}}/>Dashboard</button>
+    </aside>
+
+    <main className="chat-main">
+      <header className="chat-header">
+        <div>
+          <div className="eyebrow">DEEPSEARCH · CONVERSATION</div>
+          <h1>{scope.type==="file"?"Chat with this file":"Common workspace chat"}</h1>
+          <p>{scope.type==="file" ? scope.title+" · questions are restricted to this file." : "Questions search across every indexed file in your workspace."}</p>
+        </div>
+        <div className={"chat-scope-pill "+(scope.type==="file"?"file":"common")}>
+          {scope.type==="file"?<FileText size={13}/>:<Database size={13}/>}
+          {scope.type==="file"?"FILE ONLY":"ALL FILES"}
+        </div>
+      </header>
+
+      <section className="chat-body">
+        <div className="chat-intro">
+          <div className="chat-intro-icon"><Sparkles size={20}/></div>
+          <div><b>{scope.type==="file"?"Ask questions about this document":"Ask across your entire corpus"}</b><span>Every answer is grounded in retrieved evidence and can show citations.</span></div>
+        </div>
+
+        <div className="chat-messages">
+          {loading ? <div className="chat-empty"><Activity size={24}/><b>Loading conversation…</b></div> :
+          messages.length===0 ? <div className="chat-empty"><MessageCircle size={30}/><b>{scope.type==="file"?"Start a file conversation":"Start a corpus conversation"}</b><span>{scope.type==="file"?"Ask about a section, table, page, or any fact inside this file.":"Ask a question that needs evidence from multiple files."}</span></div> :
+          messages.map((m,i)=>(
+            <article key={m.id||i} className={"chat-message "+(m.role==="user"?"user":"assistant")}>
+              <div className="chat-avatar">{m.role==="user"?<span>G</span>:<Sparkles size={14}/>}</div>
+              <div className="chat-bubble">
+                <small>{m.role==="user"?"YOU":"DEEPSEARCH"}</small>
+                <p>{m.content}</p>
+                {m.citations?.length>0&&<div className="chat-citations">{m.citations.map((c:any,j:number)=><button key={j} onClick={()=>navigate("/dashboard?file="+encodeURIComponent(c.file_id||""))}><FileText size={12}/><span><b>{c.file_name}</b><small>{c.source_ref}</small></span><ArrowUpRight size={11}/></button>)}</div>}
+              </div>
+            </article>
+          ))}
+          <div ref={endRef}/>
+        </div>
+
+        {error&&<div className="chat-error"><AlertTriangle size={14}/>{error}</div>}
+        <div className="chat-composer">
+          <textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}}} placeholder={scope.type==="file"?"Ask this file anything…":"Ask across all indexed files…"} rows={2}/>
+          <button onClick={send} disabled={!input.trim()||sending}>{sending?<Activity size={17}/>:<Send size={17}/>}<span>{sending?"Thinking…":"Send"}</span></button>
+        </div>
+        <div className="chat-hint">Enter to send · Shift+Enter for a new line · {scope.type==="file"?"This chat is restricted to one file.":"This chat searches your complete private corpus."}</div>
+      </section>
+    </main>
+  </div>;
+}
+
 function HistoryPage(){
   const[items,setItems]=useState<any[]>([]);const[loading,setLoading]=useState(true);const[msg,setMsg]=useState('');const[open,setOpen]=useState('');const[filter,setFilter]=useState('');
   async function load(){setLoading(true);try{const d=await api.history();setItems(d.history||[])}catch(e:any){setMsg(e.message)}finally{setLoading(false)}}
@@ -1138,5 +1243,5 @@ function WorkspacePage(){
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
 function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(["/dashboard","/evaluation","/history","/workspace","/ingest"].includes(path)&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
-  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/check-email")return <CheckEmailPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password")return <ForgotPasswordPage/>;if(path==="/verify-reset")return <VerifyResetPage/>;if(path==="/reset-password")return <ResetPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;if(path==="/evaluation")return <EvaluationPage/>;if(path==="/history")return <HistoryPage/>;if(path==="/workspace")return <WorkspacePage/>;if(path==="/ingest")return <UploadFlowPage/>;return <HomePage/>}
+  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/check-email")return <CheckEmailPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password")return <ForgotPasswordPage/>;if(path==="/verify-reset")return <VerifyResetPage/>;if(path==="/reset-password")return <ResetPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;if(path==="/evaluation")return <EvaluationPage/>;if(path==="/history")return <HistoryPage/>;if(path==="/workspace")return <WorkspacePage/>;if(path==="/ingest")return <UploadFlowPage/>;if(path==="/chat")return <ChatPage/>;return <HomePage/>}
 createRoot(document.getElementById("root")!).render(<App/>);
