@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 import logging
 import re
 import time
@@ -872,6 +873,31 @@ async def upload(
             )
 
         ext = Path(safe_name).suffix.lower()
+        content_hash = hashlib.sha256(raw).hexdigest()
+
+        # Exact-content deduplication is intentionally scoped to each user's
+        # private workspace. A file with a different name but identical bytes
+        # is still the same upload.
+        existing = one(
+            """
+            SELECT id, name, status, created_at
+            FROM files
+            WHERE user_id=? AND content_hash=?
+            LIMIT 1
+            """,
+            (u["id"], content_hash),
+        )
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Duplicate file: this file is already uploaded as "
+                    f"'{existing['name']}' "
+                    f"(status: {existing['status']}, id: {existing['id']}). "
+                    "Use the existing file instead of uploading it again."
+                ),
+            )
+
         fid = str(uuid.uuid4())
         job_id = str(uuid.uuid4())
         mime_type = file.content_type or "application/octet-stream"
@@ -890,7 +916,12 @@ async def upload(
 
         created_at = now()
         exe(
-            "INSERT INTO files VALUES(?,?,?,?,?,?,?,?,?,?)",
+            """
+            INSERT INTO files
+                (id,user_id,name,mime_type,path,status,ocr_used,page_count,
+                 chunk_count,created_at,content_hash)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
             (
                 fid,
                 u["id"],
@@ -902,6 +933,7 @@ async def upload(
                 0,
                 0,
                 created_at,
+                content_hash,
             ),
         )
         exe(
@@ -947,6 +979,10 @@ async def upload(
             "queue": "redis" if queued else "background-fallback",
         }
 
+    except HTTPException:
+        if uploaded_uri:
+            storage.delete(uploaded_uri)
+        raise
     except GuardrailViolation as exc:
         if uploaded_uri:
             storage.delete(uploaded_uri)
