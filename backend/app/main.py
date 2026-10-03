@@ -3,6 +3,7 @@ import logging
 import re
 import time
 import tempfile
+import threading
 from collections import defaultdict, deque
 from datetime import timedelta, timezone
 from pathlib import Path
@@ -42,6 +43,7 @@ from .guardrails import (
     validate_upload,
 )
 from .evaluation import run_benchmark, corpus_snapshot, compare_snapshots
+from .job_queue import enqueue_job, start_worker, worker_status
 
 logger = logging.getLogger("deepsearch")
 logging.basicConfig(level=logging.INFO)
@@ -95,6 +97,7 @@ def rate_limit(request: Request, bucket: str, limit: int) -> None:
 @app.on_event("startup")
 def startup():
     init_db()
+    start_worker(_run_queued_job)
 
 
 class Register(BaseModel):
@@ -204,6 +207,7 @@ def health():
             ),
             "otp": "email_otp_10m_5_attempts",
         },
+        "ingestion_worker": worker_status(),
     }
 
 
@@ -608,6 +612,72 @@ def _update_upload_job(job_id: str, **fields) -> None:
     exe(f"UPDATE upload_jobs SET {assignments} WHERE id=?", params)
 
 
+def _job_heartbeat(job_id: str, stop_event: threading.Event) -> None:
+    while not stop_event.wait(20):
+        _update_upload_job(job_id, updated_at=now())
+
+
+def _run_queued_job(job_id: str) -> None:
+    row = one(
+        """
+        SELECT j.id, j.file_id, j.user_id, j.name, j.status,
+               f.mime_type, f.path
+        FROM upload_jobs j
+        JOIN files f ON f.id=j.file_id
+        WHERE j.id=?
+        """,
+        (job_id,),
+    )
+    if not row:
+        logger.warning("Queued ingestion job %s no longer exists", job_id)
+        return
+
+    if row["status"] != "queued":
+        return
+
+    claimed = one(
+        """
+        SELECT id
+        FROM upload_jobs
+        WHERE id=? AND status='queued'
+        """,
+        (job_id,),
+    )
+    if not claimed:
+        return
+
+    exe(
+        """
+        UPDATE upload_jobs
+        SET status='processing', stage='extracting', progress=25,
+            error=NULL, updated_at=?
+        WHERE id=? AND status='queued'
+        """,
+        (now(), job_id),
+    )
+
+    stop_heartbeat = threading.Event()
+    heartbeat = threading.Thread(
+        target=_job_heartbeat,
+        args=(job_id, stop_heartbeat),
+        name=f"deepsearch-heartbeat-{job_id[:8]}",
+        daemon=True,
+    )
+    heartbeat.start()
+
+    try:
+        _process_upload_job(
+            job_id,
+            row["user_id"],
+            row["file_id"],
+            row["name"],
+            row["mime_type"],
+            row["path"],
+        )
+    finally:
+        stop_heartbeat.set()
+
+
 def _process_upload_job(
     job_id: str,
     user_id: str,
@@ -625,6 +695,21 @@ def _process_upload_job(
             status="processing",
             stage="extracting",
             progress=25,
+        )
+
+        # Make retries idempotent. A restarted worker may have left partial
+        # chunks behind; always rebuild the file's searchable state.
+        exe(
+            "DELETE FROM chunks WHERE file_id=? AND user_id=?",
+            (file_id, user_id),
+        )
+        exe(
+            """
+            UPDATE files
+            SET status=?, ocr_used=?, page_count=?, chunk_count=?
+            WHERE id=? AND user_id=?
+            """,
+            ("processing", 0, 0, 0, file_id, user_id),
         )
 
         with tempfile.TemporaryDirectory(prefix="deepsearch-job-") as tmp:
@@ -840,23 +925,26 @@ async def upload(
             ),
         )
 
-        background_tasks.add_task(
-            _process_upload_job,
-            job_id,
-            u["id"],
-            fid,
-            safe_name,
-            mime_type,
-            uploaded_uri,
-        )
+        queued = enqueue_job(job_id)
+        if not queued:
+            background_tasks.add_task(
+                _process_upload_job,
+                job_id,
+                u["id"],
+                fid,
+                safe_name,
+                mime_type,
+                uploaded_uri,
+            )
 
         return {
             "job_id": job_id,
             "file_id": fid,
             "name": safe_name,
-            "status": "processing",
+            "status": "queued" if queued else "processing",
             "stage": "uploaded",
             "progress": 10,
+            "queue": "redis" if queued else "background-fallback",
         }
 
     except GuardrailViolation as exc:

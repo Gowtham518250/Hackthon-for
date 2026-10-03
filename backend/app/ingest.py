@@ -4,7 +4,7 @@ from threading import RLock
 
 import numpy as np
 import pandas as pd
-import fitz
+import pymupdf as fitz
 from PIL import Image
 from docx import Document
 
@@ -50,29 +50,34 @@ def extract(path: Path):
     pages = 0
 
     if ext == ".pdf":
-        doc = fitz.open(path)
-        pages = len(doc)
-        for i, page in enumerate(doc):
-            page_text = (page.get_text("text") or "").strip()
+        with fitz.open(path) as doc:
+            pages = len(doc)
+            for i, page in enumerate(doc):
+                page_text = (page.get_text("text") or "").strip()
 
-            if not page_text:
-                try:
-                    pix = page.get_pixmap(
-                        matrix=fitz.Matrix(1.5, 1.5),
-                        alpha=False,
+                if not page_text:
+                    try:
+                        # OCR each page at a moderate raster size to reduce
+                        # transient memory pressure on small Render instances.
+                        pix = page.get_pixmap(
+                            matrix=fitz.Matrix(1.25, 1.25),
+                            alpha=False,
+                        )
+                        image_bytes = pix.tobytes("png")
+                        del pix
+                        page_text = _ocr_image(image_bytes)
+                        del image_bytes
+                        if page_text:
+                            ocr = True
+                    except Exception:
+                        page_text = ""
+
+                if page_text:
+                    text += (
+                        f"\n\n[[SOURCE:page {i + 1}]]\n"
+                        f"{page_text}\n"
                     )
-                    page_text = _ocr_image(pix.tobytes("png"))
-                    if page_text:
-                        ocr = True
-                except Exception:
-                    page_text = ""
-
-            if page_text:
-                text += (
-                    f"\n\n[[SOURCE:page {i + 1}]]\n"
-                    f"{page_text}\n"
-                )
-                refs.append(f"page {i + 1}")
+                    refs.append(f"page {i + 1}")
 
     elif ext == ".docx":
         document = Document(path)
