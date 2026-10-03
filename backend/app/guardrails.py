@@ -113,6 +113,7 @@ def safe_evidence_context(results: list[dict[str, Any]]) -> list[dict[str, Any]]
             "source_ref": item.get("source_ref"),
             "score": item.get("score", 0),
             "evidence": evidence,
+            "document_contains_possible_instructions": bool(detect_prompt_injection(evidence)),
         })
     return safe
 
