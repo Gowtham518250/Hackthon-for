@@ -421,8 +421,8 @@
 .hero-universe{
   position:relative;height:590px;min-width:0;overflow:visible;
 }
-.hero-canvas{position:absolute;inset:0;z-index:0}
-.hero-canvas canvas{width:100%!important;height:100%!important}
+.landing-3d-canvas{position:absolute;inset:0;z-index:0}
+.landing-3d-canvas canvas{width:100%!important;height:100%!important}
 .hero-universe:before{
   content:"";position:absolute;left:50%;top:52%;width:420px;height:420px;
   transform:translate(-50%,-50%);
