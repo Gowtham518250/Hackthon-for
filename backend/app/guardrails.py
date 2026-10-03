@@ -291,15 +291,24 @@ def grounded_fallback(query: str, results: list[dict[str, Any]], summary_query: 
             # Keep fallback grounded while turning retrieved evidence into
             # readable prose for questions such as "what is this file about".
             first = snippets[0][:700].rstrip(" .")
+            file_name = str(top[0].get("file_name") or "the indexed file")
+            lead = " ".join(str(top[0].get("content", "")).split())[:700].rstrip(" .")
+            supporting = (
+                " ".join(str(top[1].get("content", "")).split())[:450].rstrip(" .")
+                if len(top) > 1 else ""
+            )
             answer = redact_sensitive(
-                "This file is a placement-focused practice sheet containing "
-                "100 DSA problems and an aptitude roadmap. It covers DSA "
-                "patterns such as arrays and hashing, strings, sliding window "
-                "and two pointers, stacks and queues, binary search, linked "
-                "lists, trees, heaps, greedy algorithms, graphs, and dynamic "
-                "programming, along with aptitude areas and a suggested "
-                "practice routine. "
-                + ("The indexed evidence also includes detailed problem lists and source-page references.")
+                "Based on the indexed evidence, "
+                + file_name
+                + " contains "
+                + lead
+                + "."
+                + (
+                    " The retrieved evidence also covers "
+                    + supporting
+                    + "."
+                    if supporting else ""
+                )
             )
             return {
                 "answer": answer,
