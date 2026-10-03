@@ -303,11 +303,29 @@ def _create_and_send_otp(
         "Email Verification" if purpose == "EMAIL_VERIFICATION" else "Password Reset",
     )
 
+    logger.info(
+        "OTP email requested purpose=%s recipient=%s provider=%s",
+        purpose,
+        email,
+        settings.email_provider,
+    )
+
     if not send_email(email, subject, body):
+        logger.error(
+            "OTP email was not accepted by the configured provider purpose=%s recipient=%s",
+            purpose,
+            email,
+        )
         raise HTTPException(
             503,
-            "We could not send the OTP email. Check the email provider configuration.",
+            "We could not send the OTP email. Please try Resend OTP and check the backend email delivery logs.",
         )
+
+    logger.info(
+        "OTP email accepted by provider purpose=%s recipient=%s",
+        purpose,
+        email,
+    )
 
     exe(
         """
