@@ -16,15 +16,23 @@ async function req(path:string,opt:any={}){
 export const api={
   login:async(p:any)=>{
     const d=await req("/api/auth/login",{method:"POST",body:JSON.stringify(p)});
-    token=d.access_token;sessionStorage.setItem("deep_token",token);return d;
+    token=d.access_token;
+    sessionStorage.setItem("deep_token",token);
+    return d;
   },
   register:(p:any)=>req("/api/auth/register",{method:"POST",body:JSON.stringify(p)}),
   me:()=>req("/api/auth/me"),
   files:()=>req("/api/files"),
+  stats:()=>req("/api/corpus/stats"),
+  file:(id:string)=>req(`/api/files/${id}`),
+  chunks:(id:string)=>req(`/api/files/${id}/chunks?limit=50`),
+  deleteFile:(id:string)=>req(`/api/files/${id}`,{method:"DELETE"}),
   upload:(f:File)=>{
-    const fd=new FormData();fd.append("file",f);
+    const fd=new FormData();
+    fd.append("file",f);
     return req("/api/files/upload",{method:"POST",body:fd});
   },
-  search:(query:string)=>req("/api/search",{method:"POST",body:JSON.stringify({query,limit:20})}),
+  search:(query:string,limit=20)=>req("/api/search",{method:"POST",body:JSON.stringify({query,limit})}),
+  deepSearch:(query:string,limit=20)=>req("/api/deep-search",{method:"POST",body:JSON.stringify({query,limit,with_ai:true})}),
   answer:(query:string)=>req("/api/ai/answer",{method:"POST",body:JSON.stringify({query,limit:12})})
 };
