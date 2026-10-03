@@ -16,7 +16,7 @@ async function req(path:string,opt:any={}){
   const h=new Headers(opt.headers||{});
   if(token)h.set("Authorization","Bearer "+token);
   if(opt.body && !(opt.body instanceof FormData))h.set("Content-Type","application/json");
-  const r=await fetch(API+path,{...opt,headers:h,credentials:"include"});
+  const r=await fetch(API+path,{...opt,headers:h});
   const raw=await r.text();
   let d:any={};
   try{d=raw?JSON.parse(raw):{}}catch{d={detail:raw}}
