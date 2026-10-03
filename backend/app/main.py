@@ -17,7 +17,7 @@ from .chunking import chunk_document
 from .search import search, bump_search_version
 from .ai_service import answer_with_guardrails
 from .storage import storage
-from .embeddings import embed_texts
+from .embeddings import embed_texts, embedding_status
 from .vector_index import add_embeddings
 from .guardrails import (
     GuardrailViolation,
@@ -31,7 +31,7 @@ from .guardrails import (
 logger = logging.getLogger("deepsearch")
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="DeepSearch API", version="1.2.0")
+app = FastAPI(title="DeepSearch API", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -106,10 +106,10 @@ def health():
     return {
         "status": "ok",
         "service": "deepsearch",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "database": "postgresql" if is_postgres() else "sqlite",
         "storage": storage.backend,
-        "embeddings": "Xenova/all-MiniLM-L6-v2",
+        "embeddings": embedding_status(),
         "retrieval": "hybrid-bm25-faiss",
         "guardrails": {
             "prompt_injection": True,
