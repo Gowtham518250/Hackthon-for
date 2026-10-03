@@ -73,58 +73,214 @@ function Layout({children,user=false}:{children:React.ReactNode;user?:boolean}){
   return <div className={user?"page-shell":"landing-shell"}><div className="noise-layer"/>{children}</div>
 }
 
-function AboutPage(){
+function scrollToSection(id:string){
+  document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function HeroUniverse(){
+  return <div className="hero-universe">
+    <div className="hero-canvas">
+      <Canvas camera={{position:[0,0,7.8],fov:42}} dpr={[1,1.5]}>
+        <ambientLight intensity={.6}/>
+        <pointLight position={[3,4,6]} intensity={18} color="#8291ff"/>
+        <pointLight position={[-4,-1,3]} intensity={9} color="#b36cff"/>
+        <Stars radius={38} depth={20} count={900} factor={1.8} saturation={0} fade/>
+        <ThreeSparkles count={130} scale={[12,7,8]} size={1.5} speed={.25} color="#9baaff"/>
+
+        <Float speed={.75} rotationIntensity={.05} floatIntensity={.18}>
+          <mesh rotation={[0.2,-0.45,0]}>
+            <sphereGeometry args={[1.55,32,32]}/>
+            <meshStandardMaterial
+              color="#111b4c"
+              emissive="#263aa0"
+              emissiveIntensity={.75}
+              metalness={.85}
+              roughness={.3}
+              wireframe
+              transparent
+              opacity={.72}
+            />
+          </mesh>
+          <mesh rotation={[0.2,-0.45,0]}>
+            <sphereGeometry args={[1.42,24,24]}/>
+            <meshBasicMaterial color="#556cff" wireframe transparent opacity={.08}/>
+          </mesh>
+        </Float>
+
+        <Float speed={1.2} floatIntensity={.5}>
+          <mesh position={[-1.9,1.2,.1]}>
+            <boxGeometry args={[.35,.5,.06]}/>
+            <meshStandardMaterial color="#715fff" emissive="#715fff" emissiveIntensity={1.2} metalness={.7} roughness={.22}/>
+          </mesh>
+        </Float>
+        <Float speed={1.4} floatIntensity={.65}>
+          <mesh position={[2.0,-.85,.2]}>
+            <boxGeometry args={[.4,.55,.06]}/>
+            <meshStandardMaterial color="#a06cff" emissive="#a06cff" emissiveIntensity={1.2} metalness={.7} roughness={.22}/>
+          </mesh>
+        </Float>
+      </Canvas>
+    </div>
+
+    <div className="hero-search-panel">
+      <div className="hero-search-top">
+        <Search size={19}/>
+        <span>Search across your files...</span>
+        <button aria-label="Open DeepSearch" onClick={()=>navigate("/register")}><ArrowRight size={17}/></button>
+      </div>
+      <div className="hero-format-row">
+        <span><FileText size={13}/> PDF</span>
+        <span><FileText size={13}/> DOCX</span>
+        <span><Sheet size={13}/> XLSX</span>
+        <span><Sheet size={13}/> CSV</span>
+        <span><ImageIcon size={13}/> Images</span>
+      </div>
+      <div className="hero-search-label">Try searching:</div>
+      <div className="hero-query-row">
+        <button onClick={()=>navigate("/register")}>“customer payment delays”</button>
+        <button onClick={()=>navigate("/register")}>“project report summary”</button>
+        <button onClick={()=>navigate("/register")}>“revenue in Q3”</button>
+      </div>
+    </div>
+
+    <motion.div className="hero-doc-card doc-red" animate={{y:[0,-10,0],rotateZ:[-4,-1,-4]}} transition={{duration:5.5,repeat:Infinity,ease:"easeInOut"}}>
+      <FileText size={16}/><div><b>Annual report.pdf</b><small>page 12 · 92% match</small></div>
+    </motion.div>
+    <motion.div className="hero-doc-card doc-blue" animate={{y:[0,9,0],rotateZ:[4,1,4]}} transition={{duration:4.7,repeat:Infinity,ease:"easeInOut",delay:.4}}>
+      <FileText size={16}/><div><b>brief.docx</b><small>semantic match</small></div>
+    </motion.div>
+    <motion.div className="hero-doc-card doc-green" animate={{y:[0,-7,0],x:[0,4,0]}} transition={{duration:4.9,repeat:Infinity,ease:"easeInOut",delay:.8}}>
+      <Sheet size={16}/><div><b>sales.xlsx</b><small>sheet Q3 · 1,284 rows</small></div>
+    </motion.div>
+    <motion.div className="hero-doc-card doc-purple" animate={{y:[0,8,0],x:[0,-5,0]}} transition={{duration:5.2,repeat:Infinity,ease:"easeInOut",delay:1}}>
+      <ScanText size={16}/><div><b>OCR image</b><small>searchable text</small></div>
+    </motion.div>
+    <motion.div className="hero-answer-card" animate={{y:[0,-6,0]}} transition={{duration:5.2,repeat:Infinity,ease:"easeInOut",delay:.6}}>
+      <div className="answer-top"><Sparkles size={14}/><b>Grounded answer</b><span>3 citations</span></div>
+      <p>Annual revenue increased by <strong>32%</strong> in Q3 2024.</p>
+      <small>Annual Revenue Report 2024.pdf · Page 12</small>
+    </motion.div>
+  </div>;
+}
+
+function HomePage(){
   return <Layout>
-    <div className="about-space"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div>
-    <div className="about-stars"/>
-    <header className="public-nav">
-      <button className="brand-mark link-brand" onClick={()=>navigate("/about")}><span>DEEP</span>SEARCH</button>
-      <nav>
-        <button onClick={()=>document.getElementById("how-it-works")?.scrollIntoView({behavior:"smooth"})}>How it works</button>
-        <button onClick={()=>document.getElementById("capabilities")?.scrollIntoView({behavior:"smooth"})}>Capabilities</button>
-        <button onClick={()=>navigate("/login")}>Sign in</button>
-        <button onClick={()=>navigate("/register")} className="nav-cta">Create workspace <ArrowUpRight size={14}/></button>
+    <div className="site-background">
+      <div className="site-glow glow-left"/>
+      <div className="site-glow glow-right"/>
+      <ThreeSparkles count={70}/>
+    </div>
+
+    <header className="site-nav">
+      <button className="brand-mark link-brand" onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>
+        <span>DEEP</span>SEARCH
+      </button>
+      <nav className="desktop-nav">
+        <a href="#home">Home</a>
+        <a href="#capabilities">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#use-cases">Use Cases</a>
+        <a href="#pricing">Pricing</a>
       </nav>
+      <button className="nav-about" onClick={()=>scrollToSection("about")}>About DeepSearch <ArrowRight size={14}/></button>
     </header>
 
-    <main className="about-main">
-      <section className="about-hero-new">
-        <div className="about-kicker">PRIVATE FILE INTELLIGENCE</div>
-        <h1>Turn your files into<br/><span>a searchable intelligence layer.</span></h1>
-        <p>DeepSearch reads your local corpus, retrieves the most relevant evidence and gives you a grounded answer you can trace back to the exact source.</p>
-        <div className="about-actions">
-          <button className="gradient-button" onClick={()=>navigate("/register")}>Start searching <ArrowRight size={16}/></button>
-          <button className="subtle-button big" onClick={()=>document.getElementById("how-it-works")?.scrollIntoView({behavior:"smooth"})}>See how it works</button>
+    <main>
+      <section id="home" className="hero-section">
+        <div className="hero-copy">
+          <div className="hero-badge"><Sparkles size={13}/> AI POWERED FILE SEARCH</div>
+          <h1>Turn your files into<br/><span>a searchable intelligence layer.</span></h1>
+          <p>
+            DeepSearch reads PDFs, Word documents, spreadsheets and images,
+            understands their content, tables and context, and returns
+            ranked evidence you can inspect.
+          </p>
+          <div className="hero-actions">
+            <button className="gradient-button hero-primary" onClick={()=>navigate("/register")}>Start searching <ArrowRight size={17}/></button>
+            <button className="ghost-play" onClick={()=>scrollToSection("how-it-works")}><span>▶</span> See how it works</button>
+          </div>
+
+          <div className="hero-feature-row">
+            <div><div className="hero-feature-icon"><Search size={16}/></div><div><b>Semantic Search</b><span>Find meaning, not just keywords</span></div></div>
+            <div><div className="hero-feature-icon"><ScanText size={16}/></div><div><b>OCR for Images</b><span>Search inside scanned files</span></div></div>
+            <div><div className="hero-feature-icon"><Layers3 size={16}/></div><div><b>Multi-Format</b><span>PDF, Word, Excel, CSV and more</span></div></div>
+          </div>
+
+          <div className="hero-stats">
+            <div><b>5+</b><span>File formats</span></div>
+            <div><b>Hybrid</b><span>Semantic + lexical</span></div>
+            <div><b>Source</b><span>Evidence citations</span></div>
+            <div><b>Groq</b><span>Grounded generation</span></div>
+          </div>
         </div>
 
-        <div className="hero-orbit-stage">
-          <DeepSearchVisual large/>
-          <div className="hero-chip chip-top"><FileText size={14}/><b>PDF</b><span>page-aware</span></div>
-          <div className="hero-chip chip-left"><Network size={14}/><b>SEMANTIC</b><span>vector retrieval</span></div>
-          <div className="hero-chip chip-right"><ScanText size={14}/><b>OCR</b><span>image extraction</span></div>
-          <div className="hero-chip chip-bottom"><ShieldCheck size={14}/><b>GROUNDED AI</b><span>citations enforced</span></div>
+        <HeroUniverse/>
+      </section>
+
+      <section id="capabilities" className="flow-strip">
+        <div className="flow-card">
+          <div className="flow-num">01</div><div className="flow-icon"><Upload size={19}/></div>
+          <div><b>Ingest everything</b><span>Upload files and extract text, tables, pages and OCR content.</span></div>
+          <ArrowRight className="flow-arrow" size={18}/>
+        </div>
+        <div className="flow-card">
+          <div className="flow-num">02</div><div className="flow-icon"><Search size={19}/></div>
+          <div><b>Retrieve precisely</b><span>Combine semantic vectors, lexical signals and structured metadata.</span></div>
+          <ArrowRight className="flow-arrow" size={18}/>
+        </div>
+        <div className="flow-card">
+          <div className="flow-num">03</div><div className="flow-icon"><FileSearch size={19}/></div>
+          <div><b>See evidence</b><span>Open the exact source chunk behind every ranked result.</span></div>
+          <ArrowRight className="flow-arrow" size={18}/>
         </div>
       </section>
 
-      <section id="capabilities" className="capability-row">
-        <div><div className="cap-icon"><ScanText size={16}/></div><b>Ingest everything</b><span>PDF · Word · Excel · CSV · images</span></div>
-        <div><div className="cap-icon"><Network size={16}/></div><b>Retrieve precisely</b><span>semantic + lexical + structured evidence</span></div>
-        <div><div className="cap-icon"><BrainCircuit size={16}/></div><b>Explain safely</b><span>Groq answers only from retrieved chunks</span></div>
+      <section id="how-it-works" className="dark-section how-section-new">
+        <div className="section-head-center"><div className="section-eyebrow">HOW IT WORKS</div><h2>Search first. Generate second.</h2><p>The system retrieves evidence before Groq writes an answer.</p></div>
+        <div className="pipeline-visual">
+          <div><span>01</span><Search size={19}/><b>Your question</b><small>Natural language</small></div>
+          <i>→</i>
+          <div><span>02</span><Network size={19}/><b>Relevant chunks</b><small>Semantic + lexical</small></div>
+          <i>→</i>
+          <div><span>03</span><ShieldCheck size={19}/><b>Guarded AI</b><small>Groq + citations</small></div>
+          <i>→</i>
+          <div><span>04</span><FileText size={19}/><b>Final answer</b><small>Traceable evidence</small></div>
+        </div>
       </section>
 
-      <section id="how-it-works" className="how-section">
-        <div className="section-eyebrow">THE DEEPSEARCH LOOP</div>
-        <h2>Extract. Retrieve. Explain.</h2>
-        <p>Every question follows the same evidence-first path.</p>
-        <div className="loop-grid">
-          <div><span>01</span><h3>Extract</h3><p>Parse text, tables, pages and OCR content into structured source-aware chunks.</p></div>
-          <div><span>02</span><h3>Retrieve</h3><p>Combine semantic vectors with lexical signals and metadata to rank the relevant chunks.</p></div>
-          <div><span>03</span><h3>Explain</h3><p>Groq receives only retrieved evidence and returns a cited, guarded answer.</p></div>
+      <section id="use-cases" className="use-case-section">
+        <div className="section-eyebrow">USE CASES</div><h2>Built for questions buried inside files.</h2>
+        <div className="use-case-grid">
+          <article><div className="use-icon"><BookOpen size={18}/></div><h3>Study & placement</h3><p>Ask across aptitude sheets, notes, PDFs and preparation material without manually hunting every page.</p></article>
+          <article><div className="use-icon"><Database size={18}/></div><h3>Reports & operations</h3><p>Find figures, tables, customer notes and report evidence across office documents and spreadsheets.</p></article>
+          <article><div className="use-icon"><ScanText size={18}/></div><h3>Scanned archives</h3><p>Use OCR to make image-based documents searchable and bring their evidence into ranked results.</p></article>
         </div>
+      </section>
+
+      <section id="pricing" className="pricing-section">
+        <div className="section-head-center"><div className="section-eyebrow">PRICING</div><h2>Simple while we build.</h2><p>A focused hackathon workspace first. Scale the storage and infrastructure later.</p></div>
+        <div className="pricing-card">
+          <div><span className="price-kicker">DEEPSEARCH DEMO</span><h3>Free workspace</h3><p>Everything needed to experience the evidence-first search flow.</p></div>
+          <div className="price-list"><span><CircleCheck size={14}/> Multi-format ingestion</span><span><CircleCheck size={14}/> OCR + structured chunks</span><span><CircleCheck size={14}/> Hybrid retrieval</span><span><CircleCheck size={14}/> Groq grounded answers</span></div>
+          <button className="gradient-button" onClick={()=>navigate("/register")}>Create workspace <ArrowRight size={16}/></button>
+        </div>
+      </section>
+
+      <section id="about" className="about-mini-section">
+        <div><div className="section-eyebrow">ABOUT DEEPSEARCH</div><h2>A private intelligence layer for your own corpus.</h2><p>Upload, index, ask and inspect. The product is designed around one principle: the answer should always be traceable back to the evidence.</p></div>
+        <button className="subtle-button big" onClick={()=>navigate("/register")}>Open the workspace <ArrowRight size={15}/></button>
       </section>
     </main>
-  </Layout>
+
+    <footer className="site-footer">
+      <div className="brand-mark"><span>DEEP</span>SEARCH</div>
+      <span>Private file intelligence · semantic retrieval · grounded AI</span>
+      <button onClick={()=>navigate("/login")}>Sign in <ArrowRight size={13}/></button>
+    </footer>
+  </Layout>;
 }
+
+
 function AuthShell({title,subtitle,children}:{title:string;subtitle:string;children:React.ReactNode}){
   return <Layout>
     <div className="auth-space"><CorpusScene files={[]} results={[]} onSelectFile={()=>{}} landing/></div>
@@ -199,5 +355,5 @@ function Dashboard(){
 function iconFor(mime:string){if(mime.includes("image"))return <ImageIcon size={18}/>;if(mime.includes("sheet")||mime.includes("csv"))return <Sheet size={18}/>;return <FileText size={18}/>}
 
 function App(){const route=usePath();const path=route.split("?")[0];const token=sessionStorage.getItem("deep_token");useEffect(()=>{if(path==="/dashboard"&&!sessionStorage.getItem("deep_token"))navigate("/login");if(["/login","/register","/forgot-password"].includes(path)&&token)navigate("/dashboard")},[path,token]);
-  if(path==="/"||path==="/about")return <AboutPage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password"||path==="/reset-password")return <ForgotPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;return <AboutPage/>}
+  if(path==="/"||path==="/about")return <HomePage/>;if(path==="/login")return <LoginPage/>;if(path==="/register")return <RegisterPage/>;if(path==="/verify-email")return <VerifyEmailPage/>;if(path==="/forgot-password"||path==="/reset-password")return <ForgotPasswordPage/>;if(path==="/dashboard")return <Dashboard/>;return <AboutPage/>}
 createRoot(document.getElementById("root")!).render(<App/>);
