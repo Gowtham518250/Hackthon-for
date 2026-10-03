@@ -168,7 +168,7 @@ function HomePage(){
     <div className="site-background">
       <div className="site-glow glow-left"/>
       <div className="site-glow glow-right"/>
-      <ThreeSparkles count={70}/>
+      <div className="site-particle-dust"/>
     </div>
 
     <header className="site-nav">
