@@ -46,6 +46,7 @@ export const api={
   file:(id:string)=>req("/api/files/"+id),
   chunks:(id:string)=>req("/api/files/"+id+"/chunks?limit=50"),
   deleteFile:(id:string)=>req("/api/files/"+id,{method:"DELETE"}),
+  reindexFile:(id:string)=>req("/api/files/"+id+"/reindex",{method:"POST"}),
   upload:(f:File)=>{
     const fd=new FormData(); fd.append("file",f);
     return req("/api/files/upload",{method:"POST",body:fd});
