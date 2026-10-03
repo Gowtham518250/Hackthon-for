@@ -5,7 +5,7 @@ import{createRoot}from"react-dom/client";
 import{Canvas}from"@react-three/fiber";
 import{Float,OrbitControls,Stars,Text,Line,Sparkles as ThreeSparkles}from"@react-three/drei";
 import{motion,AnimatePresence}from"framer-motion";
-import{Search,Upload,LogOut,FileText,Image as ImageIcon,Sheet,ShieldCheck,Database,Sparkles,LockKeyhole,Trash2,X,BrainCircuit,Network,Layers3,ArrowUpRight,Activity,FileSearch,ScanText,ChevronRight,CircleCheck,AlertTriangle,Mail,ArrowRight,RefreshCcw,BookOpen,KeyRound,FolderOpen,MessageCircle,Send}from"lucide-react";
+import{Search,Upload,LogOut,FileText,Image as ImageIcon,Sheet,ShieldCheck,Database,Sparkles,LockKeyhole,Trash2,X,BrainCircuit,Network,Layers3,ArrowUpRight,Activity,FileSearch,ScanText,ChevronRight,CircleCheck,AlertTriangle,Mail,ArrowRight,RefreshCcw,BookOpen,KeyRound,FolderOpen,MessageCircle,Send,BarChart3}from"lucide-react";
 import"./styles.css";
 import{api,clearAuthToken}from"./api";
 
