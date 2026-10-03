@@ -943,9 +943,13 @@ function EvaluationPage(){
 
 function UploadFlowPage(){
   const[step,setStep]=useState(0);
+  const[progress,setProgress]=useState(0);
   const[done,setDone]=useState<any>(null);
   const[error,setError]=useState('');
+  const[job,setJob]=useState<any>(null);
   const file=pendingUploadFile;
+  const startedRef=React.useRef(false);
+
   const stages=[
     {label:'UPLOADED',title:'File received',detail:'Securely accepted into the workspace',icon:<Upload size={19}/>},
     {label:'EXTRACTED',title:'Content extracted',detail:'Text, pages, tables and OCR are processed',icon:<ScanText size={19}/>},
@@ -953,29 +957,152 @@ function UploadFlowPage(){
     {label:'INDEXED',title:'Semantic index ready',detail:'Embeddings added to the search index',icon:<Network size={19}/>},
     {label:'READY',title:'Search ready',detail:'Your file can now be searched and cited',icon:<CircleCheck size={19}/>},
   ];
+
   useEffect(()=>{
     if(!file){navigate('/dashboard');return}
+    if(startedRef.current)return;
+    startedRef.current=true;
     let alive=true;
-    setStep(0);setError('');
-    const timers=[window.setTimeout(()=>alive&&setStep(1),850),window.setTimeout(()=>alive&&setStep(2),1850),window.setTimeout(()=>alive&&setStep(3),3000)];
+    const sleep=(ms:number)=>new Promise(resolve=>window.setTimeout(resolve,ms));
+
     (async()=>{
-      try{const d=await api.upload(file);if(!alive)return;setDone(d);setStep(4);pendingUploadFile=null;}
-      catch(e:any){if(!alive)return;setError(e.message||'Upload failed');setStep(0)}
+      try{
+        setError('');
+        setStep(0);
+        setProgress(5);
+
+        const accepted=await api.upload(file);
+        if(!alive)return;
+        setJob(accepted);
+        setProgress(10);
+
+        let finished=false;
+        while(alive&&!finished){
+          await sleep(900);
+          const current=await api.uploadJob(accepted.job_id);
+          if(!alive)break;
+          setJob(current);
+          setProgress(Number(current.progress)||0);
+
+          const mapped=
+            current.stage==='uploaded'||current.stage==='queued'?0:
+            current.stage==='extracting'?1:
+            current.stage==='chunking'?2:
+            current.stage==='indexing'?3:
+            current.stage==='ready'?4:0;
+          setStep(mapped);
+
+          if(current.status==='complete'){
+            finished=true;
+            setStep(4);
+            setProgress(100);
+            setDone(current.result);
+            pendingUploadFile=null;
+          }else if(current.status==='failed'){
+            finished=true;
+            setError(current.error||'The file could not be indexed.');
+          }
+        }
+      }catch(e:any){
+        if(!alive)return;
+        setError(e.message||'Upload failed. Please retry the upload.');
+      }
     })();
-    return()=>{timers.forEach(window.clearTimeout);alive=false}
+
+    return()=>{alive=false};
   },[file]);
-  const progress=step/4*100;
+
   return <div className='ingest-flow-page'>
-    <header className='ingest-flow-header'><button className='ingest-back' onClick={()=>navigate('/dashboard')}><ArrowRight size={15} style={{transform:'rotate(180deg)'}}/> Dashboard</button><div className='eyebrow'>DEEPSEARCH · LIVE INGESTION</div><span>PRIVATE WORKSPACE</span></header>
+    <header className='ingest-flow-header'>
+      <button className='ingest-back' onClick={()=>navigate('/dashboard')}>
+        <ArrowRight size={15} style={{transform:'rotate(180deg)'}}/> Dashboard
+      </button>
+      <div className='eyebrow'>DEEPSEARCH · LIVE INGESTION</div>
+      <span>PRIVATE WORKSPACE</span>
+    </header>
+
     <main className='ingest-flow-main'>
-      <div className='ingest-flow-hero'><div className='eyebrow'>END-TO-END PROCESSING</div><h1>Turning <span>{file?.name||'your file'}</span> into searchable intelligence.</h1><p>Watch the real ingestion pipeline move from file upload to extraction, chunking, semantic indexing and search-ready evidence.</p></div>
-      <section className='ingest-file-banner'><div className='ingest-file-icon'>{iconFor(file?.type||'')}</div><div><b>{file?.name}</b><small>{file?.type||'document'} · {file?Math.round(file.size/1024):0} KB</small></div><div className='ingest-progress'><div><span>PIPELINE PROGRESS</span><b>{Math.round(progress)}%</b></div><i><em style={{width:progress+'%'}}/></i></div></section>
-      <section className='ingest-visual'>
-        <div className='ingest-grid-glow'/><div className='ingest-flow-line'/><motion.div className='ingest-packet' animate={{left:(8+step*21)+'%',scale:[1,.92,1]}} transition={{duration:.9,ease:'easeInOut'}}><div><FileText size={16}/></div><span/><span/><span/></motion.div>
-        <div className='ingest-stages'>{stages.map((x,i)=><motion.div key={x.label} className={'ingest-stage '+(i<step?'complete ':'')+(i===step?'active':'')} animate={{y:i===step?-8:0}} transition={{duration:.35}}><div className='ingest-stage-icon'>{x.icon}</div><small>{String(i+1).padStart(2,'0')} · {x.label}</small><b>{x.title}</b><p>{x.detail}</p><span className='ingest-stage-status'>{i<step?'COMPLETE':i===step?'PROCESSING':'WAITING'}</span></motion.div>)}</div>
+      <div className='ingest-flow-hero'>
+        <div className='eyebrow'>END-TO-END PROCESSING</div>
+        <h1>Turning <span>{file?.name||'your file'}</span> into searchable intelligence.</h1>
+        <p>Watch the real ingestion pipeline move from file upload to extraction, chunking, semantic indexing and search-ready evidence.</p>
+      </div>
+
+      <section className='ingest-file-banner'>
+        <div className='ingest-file-icon'>{iconFor(file?.type||'')}</div>
+        <div>
+          <b>{file?.name}</b>
+          <small>{file?.type||'document'} · {file?Math.round(file.size/1024):0} KB</small>
+        </div>
+        <div className='ingest-progress'>
+          <div><span>PIPELINE PROGRESS</span><b>{Math.round(progress)}%</b></div>
+          <i><em style={{width:progress+'%'}}/></i>
+        </div>
       </section>
-      {done&&<section className='ingest-result'><div className='ingest-result-head'><CircleCheck size={22}/><div><b>Indexing complete</b><span>{done.name} is ready for DeepSearch.</span></div><button onClick={()=>navigate('/dashboard')}>Search this file <ArrowRight size={14}/></button></div><div className='ingest-stat-grid'><div><span>CHUNKS</span><b>{done.chunks}</b><small>retrieval units</small></div><div><span>SEMANTIC VECTORS</span><b>{done.embedding_chunks}</b><small>indexed embeddings</small></div><div><span>OCR</span><b>{done.performance?.ocr_used?'USED':'NOT NEEDED'}</b><small>text extraction</small></div><div><span>PROCESSING</span><b>{done.performance?.processing_ms||'—'} ms</b><small>end-to-end ingest</small></div></div></section>}
-      {error&&<section className='ingest-error'><AlertTriangle size={18}/><div><b>Indexing failed</b><span>{error}</span></div><button onClick={()=>navigate('/dashboard')}>Back to dashboard</button></section>}
+
+      <section className='ingest-visual'>
+        <div className='ingest-grid-glow'/>
+        <div className='ingest-flow-line'/>
+        <motion.div
+          className='ingest-packet'
+          animate={{left:(8+step*21)+'%',scale:[1,.92,1]}}
+          transition={{duration:.9,ease:'easeInOut'}}
+        >
+          <div><FileText size={16}/></div><span/><span/><span/>
+        </motion.div>
+        <div className='ingest-stages'>
+          {stages.map((x,i)=>
+            <motion.div
+              key={x.label}
+              className={'ingest-stage '+(i<step?'complete ':'')+(i===step?'active':'')}
+              animate={{y:i===step?-8:0}}
+              transition={{duration:.35}}
+            >
+              <div className='ingest-stage-icon'>{x.icon}</div>
+              <small>{String(i+1).padStart(2,'0')} · {x.label}</small>
+              <b>{x.title}</b>
+              <p>{x.detail}</p>
+              <span className='ingest-stage-status'>
+                {i<step?'COMPLETE':i===step?(error?'FAILED':'PROCESSING'):'WAITING'}
+              </span>
+            </motion.div>
+          )}
+        </div>
+      </section>
+
+      {job&&!done&&!error&&
+        <div className='ingest-live-status'>
+          <Activity size={16}/>
+          <div>
+            <b>{job.stage==='extracting'?'Reading document…':job.stage==='chunking'?'Creating evidence chunks…':job.stage==='indexing'?'Building semantic index…':'Preparing upload…'}</b>
+            <span>{job.progress||0}% complete · You can keep this page open while DeepSearch processes the file.</span>
+          </div>
+        </div>
+      }
+
+      {done&&
+        <section className='ingest-result'>
+          <div className='ingest-result-head'>
+            <CircleCheck size={22}/>
+            <div><b>Indexing complete</b><span>{done.name} is ready for DeepSearch.</span></div>
+            <button onClick={()=>navigate('/dashboard')}>Search this file <ArrowRight size={14}/></button>
+          </div>
+          <div className='ingest-stat-grid'>
+            <div><span>CHUNKS</span><b>{done.chunks}</b><small>retrieval units</small></div>
+            <div><span>SEMANTIC VECTORS</span><b>{done.embedding_chunks}</b><small>indexed embeddings</small></div>
+            <div><span>OCR</span><b>{done.performance?.ocr_used?'USED':'NOT NEEDED'}</b><small>text extraction</small></div>
+            <div><span>PROCESSING</span><b>{done.performance?.processing_ms||'—'} ms</b><small>end-to-end ingest</small></div>
+          </div>
+        </section>
+      }
+
+      {error&&
+        <section className='ingest-error'>
+          <AlertTriangle size={18}/>
+          <div><b>Indexing failed</b><span>{error}</span></div>
+          <button onClick={()=>navigate('/dashboard')}>Back to dashboard</button>
+        </section>
+      }
     </main>
   </div>;
 }
