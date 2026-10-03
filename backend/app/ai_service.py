@@ -157,11 +157,14 @@ async def answer_with_guardrails(
 
     requested = _requested_count(query)
     difficulty = _requested_difficulty(query)
+    summary_query = _is_summary_query(query)
 
     payload = {
         "question": query,
         "requested_count": requested,
         "requested_difficulty": difficulty,
+        "summary_query": summary_query,
+        "response_style": "concise_sentence_summary" if summary_query else ("numbered_list" if requested else "direct_answer"),
         "evidence_chunks": context,
     }
 
