@@ -42,7 +42,7 @@ SECRET_PATTERNS = [
     ),
     (
         re.compile(r"\b(?:password|passwd|secret)\s*[:=]\s*[^\s,;]+", re.I),
-        r"\1=[REDACTED]",
+        "[REDACTED_SECRET]",
     ),
 ]
 
