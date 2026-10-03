@@ -13,6 +13,7 @@ from .config import settings
 from .db import init_db, one, all_, exe, jd, jl, now, is_postgres
 from .security import hash_password, verify_password, create_token, decode
 from .ingest import extract
+from .chunking import chunk_document
 from .search import search, bump_search_version
 from .ai_service import answer_with_guardrails
 from .storage import storage
@@ -209,14 +210,10 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
 
         text, refs, ocr, pages = extract(dest)
 
-        # Actual paragraph/table/page chunks, not a single giant document.
-        chunks = [
-            piece.strip()
-            for piece in text.split("\n\n")
-            if piece.strip()
-        ]
-        if not chunks:
-            chunks = [text[:4000]] if text else []
+        # Retrieval-sized chunks preserve page/sheet provenance and keep
+        # numbered question banks as individual retrievable items.
+        chunk_records = chunk_document(text, refs)
+        chunks = [record[0] for record in chunk_records]
 
         if not chunks:
             storage.delete(uploaded_uri)
@@ -243,8 +240,9 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
 
         for i, chunk in enumerate(chunks):
             chunk_id = str(uuid.uuid4())
+            _, source_ref, chunk_meta = chunk_records[i]
             metadata = {
-                "index": i,
+                **chunk_meta,
                 "guardrails": ["document_is_untrusted_data_only"],
                 "retrieval": "faiss_semantic_plus_bm25",
                 "embedding_model": (
@@ -264,7 +262,7 @@ async def upload(request: Request, file: UploadFile = File(...), u=Depends(user)
                     fid,
                     u["id"],
                     chunk,
-                    refs[min(i, len(refs) - 1)] if refs else "document",
+                    source_ref,
                     jd(metadata),
                     jd(embedding) if embedding else None,
                 ),
