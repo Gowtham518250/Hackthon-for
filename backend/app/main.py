@@ -38,6 +38,7 @@ from .guardrails import (
     validate_query,
     validate_upload,
 )
+from .evaluation import run_benchmark, corpus_snapshot, compare_snapshots
 
 logger = logging.getLogger("deepsearch")
 logging.basicConfig(level=logging.INFO)
@@ -857,6 +858,36 @@ async def deep_search(b: DeepSearchRequest, request: Request, u=Depends(user)):
             "citations": True,
         },
     }
+
+
+@app.get("/api/evaluation/benchmark")
+def evaluation_benchmark(limit: int = 6, u=Depends(user)):
+    return run_benchmark(u["id"], max(1, min(limit, 8)))
+
+
+class EvaluationSnapshotRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=1000)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class EvaluationCompareRequest(BaseModel):
+    before: dict
+    query: str = Field(min_length=1, max_length=1000)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+@app.post("/api/evaluation/snapshot")
+def evaluation_snapshot(data: EvaluationSnapshotRequest, u=Depends(user)):
+    query = validate_query(data.query)
+    return corpus_snapshot(u["id"], query, data.limit)
+
+
+@app.post("/api/evaluation/compare")
+def evaluation_compare(data: EvaluationCompareRequest, u=Depends(user)):
+    query = validate_query(data.query)
+    after = corpus_snapshot(u["id"], query, data.limit)
+    comparison = compare_snapshots(data.before, after)
+    return {"before": data.before, "after": after, "comparison": comparison}
 
 
 @app.post("/api/ai/answer")
