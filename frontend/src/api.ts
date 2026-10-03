@@ -51,6 +51,7 @@ export const api={
     const fd=new FormData(); fd.append("file",f);
     return req("/api/files/upload",{method:"POST",body:fd});
   },
+  uploadJob:(id:string)=>req("/api/files/upload-jobs/"+id),
   search:(query:string,limit=20)=>req("/api/search",{method:"POST",body:JSON.stringify({query,limit})}),
   deepSearch:(query:string,limit=20)=>req("/api/deep-search",{method:"POST",body:JSON.stringify({query,limit,with_ai:true})}),
   answer:(query:string)=>req("/api/ai/answer",{method:"POST",body:JSON.stringify({query,limit:12})}),
