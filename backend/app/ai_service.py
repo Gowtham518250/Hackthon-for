@@ -104,7 +104,16 @@ def _requested_difficulty(query: str) -> str | None:
 
 def _is_summary_query(query: str) -> bool:
     q = re.sub(r"\s+", " ", query.lower().strip())
-    return bool(re.search(r"\b(what is|what's|summarize|summarise|overview).*(file|document|pdf|sheet).*(about|contain|summary|overview)\b", q))
+    patterns = (
+        r"\bwhat is (?:this|the|a|an) (?:file|document|pdf|sheet)\b",
+        r"\bwhat.?s (?:this|the) (?:file|document|pdf|sheet)\b",
+        r"\bwhat (?:does|do) (?:this|the) (?:file|document|pdf|sheet) (?:contain|cover|include)\b",
+        r"\bwhat (?:this|the) (?:file|document|pdf|sheet) contains\b",
+        r"\bsummar(?:ize|ise) (?:this|the|a|an) (?:file|document|pdf|sheet)\b",
+        r"\b(?:give|show) (?:me )?(?:a )?(?:summary|overview)\b",
+        r"\boverview of (?:this|the|a|an) (?:file|document|pdf|sheet)\b",
+    )
+    return any(re.search(pattern, q) for pattern in patterns)
 
 def _generate_sync(prompt: str) -> str:
     client = _client()
