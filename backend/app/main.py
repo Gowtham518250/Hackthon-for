@@ -46,7 +46,7 @@ from .guardrails import (
     validate_upload,
 )
 from .evaluation import run_benchmark, corpus_snapshot, compare_snapshots
-from .job_queue import enqueue_job, force_enqueue_job, start_worker, worker_status
+from .job_queue import enqueue_job, start_worker, worker_status
 
 logger = logging.getLogger("deepsearch")
 logging.basicConfig(level=logging.INFO)
@@ -85,79 +85,6 @@ _NUDGE_LAST: dict[str, float] = {}
 _NUDGE_LOCK = threading.Lock()
 
 
-def _wake_ingestion_service() -> bool:
-    hostport = os.getenv("INGESTION_WORKER_HOSTPORT", "").strip()
-    if hostport:
-        try:
-            with httpx.Client(timeout=3.0, follow_redirects=True) as client:
-                response = client.get(
-                    f"http://{hostport}/wake",
-                    headers={
-                        "X-Worker-Wake-Token": os.getenv(
-                            "INGESTION_WORKER_WAKE_TOKEN", ""
-                        ).strip()
-                    },
-                )
-                logger.info(
-                    "Ingestion worker private wake status=%s",
-                    response.status_code,
-                )
-                if 200 <= response.status_code < 300:
-                    return True
-        except Exception as exc:
-            logger.info("Private ingestion worker wake failed: %s", exc)
-
-    worker_url = (
-        os.getenv("INGESTION_WORKER_EXTERNAL_URL", "").strip().rstrip("/")
-        or os.getenv("INGESTION_WORKER_EXTERNAL_HOST", "").strip()
-    )
-
-    # Render normally provides RENDER_EXTERNAL_URL for the worker service.
-    # Keep a deterministic fallback for the Blueprint service name so an older
-    # deployment missing the cross-service env reference can still recover.
-    if not worker_url:
-        worker_url = "https://deepsearch-ingestion-worker.onrender.com"
-
-    if not worker_url.startswith(("http://", "https://")):
-        worker_url = f"https://{worker_url}"
-
-    token = os.getenv("INGESTION_WORKER_WAKE_TOKEN", "").strip()
-
-    try:
-        headers = {"X-Worker-Wake-Token": token} if token else {}
-        with httpx.Client(timeout=5.0, follow_redirects=True) as client:
-            response = client.get(
-                f"{worker_url}/wake",
-                headers=headers,
-            )
-            logger.info(
-                "Ingestion worker wake request status=%s url=%s",
-                response.status_code,
-                worker_url,
-            )
-            return 200 <= response.status_code < 300
-    except Exception as exc:
-        logger.warning(
-            "Ingestion worker wake request failed url=%s error=%s",
-            worker_url,
-            exc,
-        )
-        return False
-
-
-def _nudge_ingestion_job(job_id: str) -> None:
-    """Repair a queued job after a sleeping/restarted free worker."""
-    now_ts = time.time()
-    with _NUDGE_LOCK:
-        last = _NUDGE_LAST.get(job_id, 0.0)
-        if now_ts - last < 10.0:
-            return
-        _NUDGE_LAST[job_id] = now_ts
-
-    if force_enqueue_job(job_id):
-        _wake_ingestion_service()
-
-
 def rate_limit(request: Request, bucket: str, limit: int) -> None:
     now_ts = __import__("time").time()
     key = f"{bucket}:{request.client.host if request.client else 'unknown'}"
@@ -174,9 +101,18 @@ def rate_limit(request: Request, bucket: str, limit: int) -> None:
 
 @app.on_event("startup")
 def startup():
-    # The ingestion worker runs as a separate Render background worker so
-    # OCR/embedding memory spikes cannot restart the public API process.
     init_db()
+
+    # Consume the durable Redis ingestion queue inside this API instance.
+    # This avoids relying on a second Render service/wake URL on free plans.
+    started = start_worker(_run_queued_job)
+    if started:
+        logger.info("Embedded ingestion worker started in API service")
+    else:
+        logger.warning(
+            "Embedded ingestion worker not started; uploads use the local "
+            "development fallback when Redis is unavailable."
+        )
 
 
 class Register(BaseModel):
@@ -716,29 +652,22 @@ def _run_queued_job(job_id: str) -> None:
         logger.warning("Queued ingestion job %s no longer exists", job_id)
         return
 
-    if row["status"] != "queued":
-        return
-
+    # Atomically claim the queued job. This prevents duplicate processing if
+    # the old free-worker web service and the embedded API worker both see the
+    # same Redis queue entry during a deployment transition.
+    claim_time = now()
     claimed = one(
-        """
-        SELECT id
-        FROM upload_jobs
-        WHERE id=? AND status='queued'
-        """,
-        (job_id,),
-    )
-    if not claimed:
-        return
-
-    exe(
         """
         UPDATE upload_jobs
         SET status='processing', stage='extracting', progress=25,
             error=NULL, updated_at=?
         WHERE id=? AND status='queued'
+        RETURNING id
         """,
-        (now(), job_id),
+        (claim_time, job_id),
     )
+    if not claimed:
+        return
 
     stop_heartbeat = threading.Event()
     heartbeat = threading.Thread(
@@ -1107,9 +1036,7 @@ async def upload(
         )
 
         queued = enqueue_job(job_id)
-        if queued:
-            _wake_ingestion_service()
-        else:
+        if not queued:
             background_tasks.add_task(
                 _process_upload_job,
                 job_id,
@@ -1177,7 +1104,6 @@ async def upload(
 @app.get("/api/files/upload-jobs/{job_id}")
 def upload_job_status(
     job_id: str,
-    background_tasks: BackgroundTasks,
     u=Depends(user),
 ):
     row = one(
@@ -1187,25 +1113,6 @@ def upload_job_status(
     )
     if not row:
         raise HTTPException(404, "Upload job not found")
-
-    # The browser polls this endpoint throughout ingestion. Use the polling
-    # traffic to repair a queued job if the free worker was asleep, restarted,
-    # or missed its original wake-up request. The repair runs after the
-    # response so polling remains fast.
-    status = str(row.get("status") or "")
-    progress = int(row.get("progress") or 0)
-    if status == "queued" and progress <= 10:
-        try:
-            updated_at = parse_iso(row.get("updated_at") or "")
-            age_seconds = max(
-                0.0,
-                (utcnow() - updated_at).total_seconds(),
-            )
-        except Exception:
-            age_seconds = 999.0
-
-        if age_seconds >= 5:
-            background_tasks.add_task(_nudge_ingestion_job, job_id)
 
     result = jl(row.get("result") or "{}", {})
     return {
