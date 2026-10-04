@@ -140,14 +140,21 @@ def _process_upload_job(
                 safe_name,
             )
             extract_started = time.perf_counter()
-            text, refs, ocr, pages = extract(
-                dest,
-                progress_callback=lambda progress: _update_upload_job(
-                    job_id,
-                    stage="extracting",
-                    progress=progress,
-                ),
-            )
+            try:
+                text, refs, ocr, pages = extract(
+                    dest,
+                    progress_callback=lambda progress: _update_upload_job(
+                        job_id,
+                        stage="extracting",
+                        progress=progress,
+                    ),
+                )
+            finally:
+                try:
+                    from .ingest import release_ocr_engine
+                    release_ocr_engine()
+                except Exception:
+                    logger.exception("Could not release OCR resources")
             extract_ms = (time.perf_counter() - extract_started) * 1000
             logger.info(
                 "External worker extraction complete job=%s file=%s pages=%s ocr=%s extraction_ms=%.1f",
@@ -171,13 +178,6 @@ def _process_upload_job(
                     ("failed", int(ocr), pages, 0, file_id, user_id),
                 )
                 return
-
-            # Release OCR resources before loading the embedding/FAISS stack.
-            try:
-                from .ingest import release_ocr_engine
-                release_ocr_engine()
-            except Exception:
-                logger.exception("Could not release OCR resources")
 
             _update_upload_job(job_id, stage="chunking", progress=45)
 
