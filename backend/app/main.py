@@ -669,6 +669,12 @@ def _run_queued_job(job_id: str) -> None:
     if not claimed:
         return
 
+    logger.info(
+        "Ingestion job claimed job=%s file=%s",
+        job_id,
+        row["name"],
+    )
+
     stop_heartbeat = threading.Event()
     heartbeat = threading.Thread(
         target=_job_heartbeat,
@@ -729,6 +735,11 @@ def _process_upload_job(
             dest = Path(tmp) / f"{file_id}{ext}"
             storage.download_file(uploaded_uri, dest)
 
+            logger.info(
+                "Starting document extraction job=%s file=%s",
+                job_id,
+                safe_name,
+            )
             extract_started = time.perf_counter()
             text, refs, ocr, pages = extract(
                 dest,
@@ -739,6 +750,14 @@ def _process_upload_job(
                 ),
             )
             extract_ms = (time.perf_counter() - extract_started) * 1000
+            logger.info(
+                "Document extraction complete job=%s file=%s pages=%s ocr=%s extraction_ms=%.1f",
+                job_id,
+                safe_name,
+                pages,
+                bool(ocr),
+                extract_ms,
+            )
 
             if not text.strip():
                 _update_upload_job(
@@ -1337,6 +1356,12 @@ def delete_file(file_id: str, u=Depends(user)):
 
     exe(
         "DELETE FROM chunks WHERE file_id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
+    # Remove the durable job row as well. Otherwise deleted files leave
+    # queued upload jobs behind, which can rebuild a large Redis backlog.
+    exe(
+        "DELETE FROM upload_jobs WHERE file_id=? AND user_id=?",
         (file_id, u["id"]),
     )
     exe(

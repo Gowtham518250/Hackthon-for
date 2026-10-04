@@ -12,9 +12,11 @@ logger = logging.getLogger("deepsearch.queue")
 # Version the queue namespace so stale job IDs from earlier deployments are
 # never consumed by the current worker. Existing valid PostgreSQL jobs are
 # re-enqueued into this fresh namespace by recover_jobs().
-QUEUE_NAME = "deepsearch:ingestion:jobs:v2"
-PENDING_SET = "deepsearch:ingestion:pending:v2"
-STALE_AFTER_SECONDS = 10 * 60
+# The worker heartbeat runs every 20 seconds, so 60 seconds is long enough
+# to distinguish a live OCR job from one interrupted by a process restart.
+QUEUE_NAME = "deepsearch:ingestion:jobs:v3"
+PENDING_SET = "deepsearch:ingestion:pending:v3"
+STALE_AFTER_SECONDS = 60
 RECOVERY_INTERVAL_SECONDS = 15
 REDIS_CONNECT_TIMEOUT_SECONDS = 3
 REDIS_SOCKET_TIMEOUT_SECONDS = 15
@@ -137,6 +139,11 @@ def recover_jobs() -> dict[str, int]:
 
     stale_count = 0
     for row in stale_rows:
+        logger.warning(
+            "Recovering interrupted ingestion job=%s file_id=%s",
+            row["id"],
+            row["file_id"],
+        )
         job_id = row["id"]
         exe(
             """
@@ -166,7 +173,7 @@ def recover_jobs() -> dict[str, int]:
         SELECT id
         FROM upload_jobs
         WHERE status='queued'
-        ORDER BY created_at ASC
+        ORDER BY created_at DESC
         LIMIT 100
         """
     )
