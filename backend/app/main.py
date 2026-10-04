@@ -891,6 +891,15 @@ def _find_duplicate_file(
     )
 
     for row in legacy:
+        # Legacy records created while Render used ephemeral local storage
+        # cannot be reconstructed after a restart. Do not repeatedly attempt
+        # to read those dead paths during duplicate checks.
+        if (
+            storage.backend == "database"
+            and not str(row.get("path") or "").startswith("db://")
+        ):
+            continue
+
         try:
             with tempfile.TemporaryDirectory(prefix="deepsearch-dedupe-") as tmp:
                 destination = Path(tmp) / f"{row['id']}.pdf"
