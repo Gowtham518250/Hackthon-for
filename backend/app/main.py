@@ -84,21 +84,28 @@ _RATE: dict[str, deque[float]] = defaultdict(deque)
 
 
 def _wake_ingestion_service() -> None:
-    hostport = os.getenv("INGESTION_WORKER_HOSTPORT", "").strip()
-    if not hostport:
+    hostname = os.getenv("INGESTION_WORKER_EXTERNAL_HOST", "").strip()
+    token = os.getenv("INGESTION_WORKER_WAKE_TOKEN", "").strip()
+    if not hostname:
+        logger.warning("Ingestion worker external hostname is not configured")
         return
 
     try:
-        # Best-effort wake-up for the free-plan web worker. A sleeping Render
-        # web service can be started by an internal HTTP request. The upload
-        # must never fail just because the worker takes longer than this
-        # short wake-up timeout to boot.
-        with httpx.Client(timeout=2.0) as client:
-            client.get(f"http://{hostport}/health")
-    except Exception:
+        # Free Render web services cannot receive private-network traffic, but
+        # they do wake when their public URL receives an HTTP request. Keep
+        # this request best-effort: the queued Redis job remains durable while
+        # the worker spins up.
+        headers = {"X-Worker-Wake-Token": token} if token else {}
+        with httpx.Client(timeout=2.5, follow_redirects=True) as client:
+            response = client.get(f"https://{hostname}/wake", headers=headers)
+            logger.info(
+                "Ingestion worker wake request status=%s",
+                response.status_code,
+            )
+    except Exception as exc:
         logger.info(
-            "Ingestion worker wake-up request did not complete immediately",
-            exc_info=True,
+            "Ingestion worker wake-up request did not complete immediately: %s",
+            exc,
         )
 
 
@@ -1231,7 +1238,17 @@ def reindex_file(file_id: str, u=Depends(user)):
         suffix = Path(row["name"]).suffix.lower()
         with tempfile.TemporaryDirectory(prefix="deepsearch-reindex-") as tmp:
             temp_path = Path(tmp) / f"{file_id}{suffix}"
-            storage.download_file(row["path"], temp_path)
+            try:
+                storage.download_file(row["path"], temp_path)
+            except FileNotFoundError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "The original file is no longer available because it "
+                        "was uploaded before persistent storage was enabled. "
+                        "Please upload the file again to rebuild its index."
+                    ),
+                ) from exc
 
             extract_started = time.perf_counter()
             text, refs, ocr, pages = extract(temp_path)
@@ -1474,10 +1491,7 @@ async def chat_message(data: ChatMessageRequest, request: Request, u=Depends(use
             "SELECT status,chunk_count FROM files WHERE id=? AND user_id=?",
             (scoped_file_id, u["id"]),
         )
-        if readiness and (
-            readiness["status"] != "indexed"
-            or int(readiness.get("chunk_count") or 0) == 0
-        ):
+        if readiness and int(readiness.get("chunk_count") or 0) == 0:
             raise HTTPException(
                 status_code=409,
                 detail=(
