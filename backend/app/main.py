@@ -1115,6 +1115,7 @@ def upload_job_status(
         raise HTTPException(404, "Upload job not found")
 
     result = jl(row.get("result") or "{}", {})
+    progress = int(row.get("progress") or 0)
     return {
         "job_id": row["id"],
         "file_id": row["file_id"],
