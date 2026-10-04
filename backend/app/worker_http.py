@@ -2,11 +2,11 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 
 from .db import init_db
 from .job_queue import start_worker, stop_worker, worker_status
-from .main import _run_queued_job
+from .ingestion_worker import _run_queued_job
 
 logger = logging.getLogger("deepsearch.worker_http")
 
