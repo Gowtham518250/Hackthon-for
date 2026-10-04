@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 from .config import settings
-from .db import all_, exe, now
+from .db import all_, exe, now, is_postgres
 
 logger = logging.getLogger("deepsearch.queue")
 
@@ -14,8 +14,8 @@ logger = logging.getLogger("deepsearch.queue")
 # re-enqueued into this fresh namespace by recover_jobs().
 # The worker heartbeat runs every 20 seconds, so 60 seconds is long enough
 # to distinguish a live OCR job from one interrupted by a process restart.
-QUEUE_NAME = "deepsearch:ingestion:jobs:v3"
-PENDING_SET = "deepsearch:ingestion:pending:v3"
+QUEUE_NAME = "deepsearch:ingestion:jobs:v4"
+PENDING_SET = "deepsearch:ingestion:pending:v4"
 STALE_AFTER_SECONDS = 60
 RECOVERY_INTERVAL_SECONDS = 15
 REDIS_CONNECT_TIMEOUT_SECONDS = 3
@@ -170,16 +170,57 @@ def recover_jobs() -> dict[str, int]:
 
     queued_rows = all_(
         """
-        SELECT id
-        FROM upload_jobs
-        WHERE status='queued'
-        ORDER BY created_at DESC
+        SELECT j.id, j.file_id, f.path
+        FROM upload_jobs j
+        LEFT JOIN files f ON f.id=j.file_id
+        WHERE j.status='queued'
+        ORDER BY j.created_at DESC
         LIMIT 100
         """
     )
 
     queued_count = 0
     for row in queued_rows:
+        file_path = str(row.get("path") or "")
+        production_database_storage = (
+            settings.storage_backend.lower() == "database"
+            or (
+                settings.storage_backend.lower() == "local"
+                and is_postgres()
+            )
+        )
+
+        # Never keep legacy local-storage jobs in the durable production
+        # queue. Their source bytes disappeared when the old Render instance
+        # restarted, so retrying them only creates a permanent backlog.
+        if (
+            production_database_storage
+            and file_path
+            and not file_path.startswith("db://")
+        ):
+            exe(
+                """
+                UPDATE upload_jobs
+                SET status='failed',
+                    stage='failed',
+                    progress=0,
+                    error=?,
+                    updated_at=?
+                WHERE id=? AND status='queued'
+                """,
+                (
+                    "Original file is unavailable because it belongs to the old ephemeral local storage backend. Please upload the file again.",
+                    now(),
+                    row["id"],
+                ),
+            )
+            if row.get("file_id"):
+                exe(
+                    "UPDATE files SET status=? WHERE id=?",
+                    ("failed", row["file_id"]),
+                )
+            continue
+
         if enqueue_job(row["id"]):
             queued_count += 1
 
