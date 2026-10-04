@@ -97,8 +97,9 @@ def rate_limit(request: Request, bucket: str, limit: int) -> None:
 
 @app.on_event("startup")
 def startup():
+    # The ingestion worker runs as a separate Render background worker so
+    # OCR/embedding memory spikes cannot restart the public API process.
     init_db()
-    start_worker(_run_queued_job)
 
 
 class Register(BaseModel):
@@ -163,6 +164,11 @@ async def user(authorization: str | None = Header(default=None)):
     if not u:
         raise HTTPException(401, "User not found")
     return u
+
+
+@app.get("/")
+def root_health():
+    return {"service": "deepsearch", "status": "ok"}
 
 
 @app.get("/api/health")
