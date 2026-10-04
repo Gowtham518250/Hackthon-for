@@ -2,7 +2,6 @@ from io import BytesIO
 from pathlib import Path
 from threading import RLock
 import gc
-import os
 
 import numpy as np
 import pandas as pd
