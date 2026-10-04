@@ -22,6 +22,11 @@ services:
           name: deepsearch-redis
           type: keyvalue
           property: connectionString
+      - key: INGESTION_WORKER_HOSTPORT
+        fromService:
+          name: deepsearch-ingestion-worker
+          type: web
+          property: hostport
       - key: INGESTION_WORKER_EXTERNAL_URL
         fromService:
           name: deepsearch-ingestion-worker
