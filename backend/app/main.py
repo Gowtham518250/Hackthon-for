@@ -86,6 +86,27 @@ _NUDGE_LOCK = threading.Lock()
 
 
 def _wake_ingestion_service() -> bool:
+    hostport = os.getenv("INGESTION_WORKER_HOSTPORT", "").strip()
+    if hostport:
+        try:
+            with httpx.Client(timeout=3.0, follow_redirects=True) as client:
+                response = client.get(
+                    f"http://{hostport}/wake",
+                    headers={
+                        "X-Worker-Wake-Token": os.getenv(
+                            "INGESTION_WORKER_WAKE_TOKEN", ""
+                        ).strip()
+                    },
+                )
+                logger.info(
+                    "Ingestion worker private wake status=%s",
+                    response.status_code,
+                )
+                if 200 <= response.status_code < 300:
+                    return True
+        except Exception as exc:
+            logger.info("Private ingestion worker wake failed: %s", exc)
+
     worker_url = (
         os.getenv("INGESTION_WORKER_EXTERNAL_URL", "").strip().rstrip("/")
         or os.getenv("INGESTION_WORKER_EXTERNAL_HOST", "").strip()
