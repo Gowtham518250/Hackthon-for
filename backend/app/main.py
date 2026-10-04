@@ -246,7 +246,11 @@ def health():
             ),
             "otp": "email_otp_10m_5_attempts",
         },
-        "ingestion_worker": worker_status(),
+        "ingestion_worker": {
+            **worker_status(),
+            "mode": "external",
+            "configured": bool(settings.ingestion_worker_external_url),
+        },
     }
 
 
