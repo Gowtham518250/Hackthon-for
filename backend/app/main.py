@@ -1388,7 +1388,7 @@ async def deep_search(b: DeepSearchRequest, request: Request, u=Depends(user)):
 def _chat_scope(file_id: str | None, user_id: str) -> tuple[str, str | None, str]:
     if file_id:
         file_row = one(
-            "SELECT id,name FROM files WHERE id=? AND user_id=?",
+            "SELECT id,name,status,chunk_count FROM files WHERE id=? AND user_id=?",
             (file_id, user_id),
         )
         if not file_row:
@@ -1468,6 +1468,24 @@ async def chat_message(data: ChatMessageRequest, request: Request, u=Depends(use
     rate_limit(request, "chat", 20)
     query = guard_ai_query(data.message)
     scope_type, scoped_file_id, scope_title = _chat_scope(data.file_id, u["id"])
+
+    if scoped_file_id:
+        readiness = one(
+            "SELECT status,chunk_count FROM files WHERE id=? AND user_id=?",
+            (scoped_file_id, u["id"]),
+        )
+        if readiness and (
+            readiness["status"] != "indexed"
+            or int(readiness.get("chunk_count") or 0) == 0
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "This file is still being indexed. "
+                    "Please wait until the ingestion pipeline reaches "
+                    "'Search ready' before asking questions."
+                ),
+            )
 
     thread = None
     if data.thread_id:
