@@ -1231,7 +1231,17 @@ def reindex_file(file_id: str, u=Depends(user)):
         suffix = Path(row["name"]).suffix.lower()
         with tempfile.TemporaryDirectory(prefix="deepsearch-reindex-") as tmp:
             temp_path = Path(tmp) / f"{file_id}{suffix}"
-            storage.download_file(row["path"], temp_path)
+            try:
+                storage.download_file(row["path"], temp_path)
+            except FileNotFoundError as exc:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "The original file is no longer available because it "
+                        "was uploaded before persistent storage was enabled. "
+                        "Please upload this file again to rebuild its index."
+                    ),
+                ) from exc
 
             extract_started = time.perf_counter()
             text, refs, ocr, pages = extract(temp_path)
@@ -1474,10 +1484,7 @@ async def chat_message(data: ChatMessageRequest, request: Request, u=Depends(use
             "SELECT status,chunk_count FROM files WHERE id=? AND user_id=?",
             (scoped_file_id, u["id"]),
         )
-        if readiness and (
-            readiness["status"] != "indexed"
-            or int(readiness.get("chunk_count") or 0) == 0
-        ):
+        if readiness and int(readiness.get("chunk_count") or 0) == 0:
             raise HTTPException(
                 status_code=409,
                 detail=(
