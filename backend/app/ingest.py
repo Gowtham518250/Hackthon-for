@@ -4,10 +4,6 @@ from threading import RLock
 import gc
 
 import numpy as np
-import pandas as pd
-import pymupdf as fitz
-from PIL import Image
-from docx import Document
 
 _OCR = None
 _OCR_LOCK = RLock()
@@ -38,6 +34,8 @@ def _ocr_engine():
 
 def _ocr_image(image_bytes: bytes) -> str:
     try:
+        from PIL import Image
+
         with Image.open(BytesIO(image_bytes)) as source:
             image = source.convert("RGB")
             result = _ocr_engine()(
@@ -59,6 +57,13 @@ def _ocr_image(image_bytes: bytes) -> str:
         return ""
 
 
+def release_ocr_engine() -> None:
+    global _OCR
+    with _OCR_LOCK:
+        _OCR = None
+    gc.collect()
+
+
 def extract(path: Path, progress_callback=None):
     ext = path.suffix.lower()
     text = ""
@@ -67,6 +72,8 @@ def extract(path: Path, progress_callback=None):
     pages = 0
 
     if ext == ".pdf":
+        import pymupdf as fitz
+
         with fitz.open(path) as doc:
             pages = len(doc)
             native_pages: list[str] = []
@@ -133,6 +140,8 @@ def extract(path: Path, progress_callback=None):
                     refs.append(f"page {i + 1}")
 
     elif ext == ".docx":
+        from docx import Document
+
         document = Document(path)
         paragraphs = [
             p.text.strip()
@@ -148,6 +157,8 @@ def extract(path: Path, progress_callback=None):
         refs = ["document"]
 
     elif ext in {".xlsx", ".xls"}:
+        import pandas as pd
+
         sheets = pd.read_excel(path, sheet_name=None)
         frames = []
         for sheet_name, frame in sheets.items():

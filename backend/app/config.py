@@ -41,6 +41,16 @@ class Settings:
     )
     redis_url: str = os.getenv("REDIS_URL", "")
 
+    # Free Render web-service worker used for long-running ingestion.
+    ingestion_worker_external_url: str = os.getenv(
+        "INGESTION_WORKER_EXTERNAL_URL",
+        "",
+    ).strip()
+    ingestion_worker_wake_token: str = os.getenv(
+        "INGESTION_WORKER_WAKE_TOKEN",
+        "",
+    ).strip()
+
     # Transactional email: same HTTPS Brevo configuration used by Retail Mind.
     email_provider: str = os.getenv("EMAIL_PROVIDER", "brevo").strip().lower()
     brevo_api_url: str = os.getenv(
