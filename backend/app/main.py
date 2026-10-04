@@ -995,6 +995,10 @@ def reindex_file(file_id: str, u=Depends(user)):
     if not row:
         raise HTTPException(404, "File not found")
 
+    from .ingest import extract
+    from .chunking import chunk_document
+    from .embeddings import embed_texts
+
     started_at = time.perf_counter()
     temp_path = None
     try:
