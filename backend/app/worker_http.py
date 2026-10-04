@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -38,5 +39,17 @@ def health():
     return {
         "service": "deepsearch-ingestion-worker",
         "status": "ok",
+        "worker": worker_status(),
+    }
+
+
+@app.get("/wake")
+def wake(x_worker_wake_token: str | None = Header(default=None)):
+    expected = os.getenv("INGESTION_WORKER_WAKE_TOKEN", "").strip()
+    if expected and x_worker_wake_token != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {
+        "service": "deepsearch-ingestion-worker",
+        "status": "awake",
         "worker": worker_status(),
     }
