@@ -70,7 +70,6 @@ def extract(path: Path, progress_callback=None):
         with fitz.open(path) as doc:
             pages = len(doc)
             native_pages: list[str] = []
-            native_refs: list[str] = []
             native_chars = 0
 
             # First pass: extract native PDF text without initializing OCR.
