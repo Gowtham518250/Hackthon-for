@@ -86,30 +86,39 @@ _NUDGE_LOCK = threading.Lock()
 
 
 def _wake_ingestion_service() -> bool:
-    hostname = os.getenv("INGESTION_WORKER_EXTERNAL_HOST", "").strip()
+    worker_url = (
+        os.getenv("INGESTION_WORKER_EXTERNAL_URL", "").strip().rstrip("/")
+        or os.getenv("INGESTION_WORKER_EXTERNAL_HOST", "").strip()
+    )
+
+    # Render normally provides RENDER_EXTERNAL_URL for the worker service.
+    # Keep a deterministic fallback for the Blueprint service name so an older
+    # deployment missing the cross-service env reference can still recover.
+    if not worker_url:
+        worker_url = "https://deepsearch-ingestion-worker.onrender.com"
+
+    if not worker_url.startswith(("http://", "https://")):
+        worker_url = f"https://{worker_url}"
+
     token = os.getenv("INGESTION_WORKER_WAKE_TOKEN", "").strip()
-    if not hostname:
-        logger.warning(
-            "Ingestion worker external hostname is not configured"
-        )
-        return False
 
     try:
         headers = {"X-Worker-Wake-Token": token} if token else {}
-        with httpx.Client(timeout=4.0, follow_redirects=True) as client:
+        with httpx.Client(timeout=5.0, follow_redirects=True) as client:
             response = client.get(
-                f"https://{hostname}/wake",
+                f"{worker_url}/wake",
                 headers=headers,
             )
             logger.info(
-                "Ingestion worker wake request status=%s host=%s",
+                "Ingestion worker wake request status=%s url=%s",
                 response.status_code,
-                hostname,
+                worker_url,
             )
             return 200 <= response.status_code < 300
     except Exception as exc:
-        logger.info(
-            "Ingestion worker wake-up request did not complete immediately: %s",
+        logger.warning(
+            "Ingestion worker wake request failed url=%s error=%s",
+            worker_url,
             exc,
         )
         return False
