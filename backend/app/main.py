@@ -46,7 +46,7 @@ from .guardrails import (
     validate_upload,
 )
 from .evaluation import run_benchmark, corpus_snapshot, compare_snapshots
-from .job_queue import enqueue_job, start_worker, worker_status
+from .job_queue import enqueue_job, force_enqueue_job, start_worker, worker_status
 
 logger = logging.getLogger("deepsearch")
 logging.basicConfig(level=logging.INFO)
@@ -81,32 +81,51 @@ if settings.storage_backend.lower() == "local":
     Path(settings.local_storage_dir).mkdir(parents=True, exist_ok=True)
 
 _RATE: dict[str, deque[float]] = defaultdict(deque)
+_NUDGE_LAST: dict[str, float] = {}
+_NUDGE_LOCK = threading.Lock()
 
 
-def _wake_ingestion_service() -> None:
+def _wake_ingestion_service() -> bool:
     hostname = os.getenv("INGESTION_WORKER_EXTERNAL_HOST", "").strip()
     token = os.getenv("INGESTION_WORKER_WAKE_TOKEN", "").strip()
     if not hostname:
-        logger.warning("Ingestion worker external hostname is not configured")
-        return
+        logger.warning(
+            "Ingestion worker external hostname is not configured"
+        )
+        return False
 
     try:
-        # Free Render web services cannot receive private-network traffic, but
-        # they do wake when their public URL receives an HTTP request. Keep
-        # this request best-effort: the queued Redis job remains durable while
-        # the worker spins up.
         headers = {"X-Worker-Wake-Token": token} if token else {}
-        with httpx.Client(timeout=2.5, follow_redirects=True) as client:
-            response = client.get(f"https://{hostname}/wake", headers=headers)
-            logger.info(
-                "Ingestion worker wake request status=%s",
-                response.status_code,
+        with httpx.Client(timeout=4.0, follow_redirects=True) as client:
+            response = client.get(
+                f"https://{hostname}/wake",
+                headers=headers,
             )
+            logger.info(
+                "Ingestion worker wake request status=%s host=%s",
+                response.status_code,
+                hostname,
+            )
+            return 200 <= response.status_code < 300
     except Exception as exc:
         logger.info(
             "Ingestion worker wake-up request did not complete immediately: %s",
             exc,
         )
+        return False
+
+
+def _nudge_ingestion_job(job_id: str) -> None:
+    """Repair a queued job after a sleeping/restarted free worker."""
+    now_ts = time.time()
+    with _NUDGE_LOCK:
+        last = _NUDGE_LAST.get(job_id, 0.0)
+        if now_ts - last < 10.0:
+            return
+        _NUDGE_LAST[job_id] = now_ts
+
+    if force_enqueue_job(job_id):
+        _wake_ingestion_service()
 
 
 def rate_limit(request: Request, bucket: str, limit: int) -> None:
@@ -1126,7 +1145,11 @@ async def upload(
 
 
 @app.get("/api/files/upload-jobs/{job_id}")
-def upload_job_status(job_id: str, u=Depends(user)):
+def upload_job_status(
+    job_id: str,
+    background_tasks: BackgroundTasks,
+    u=Depends(user),
+):
     row = one(
         "SELECT id,file_id,name,status,stage,progress,error,result,created_at,updated_at "
         "FROM upload_jobs WHERE id=? AND user_id=?",
@@ -1135,6 +1158,25 @@ def upload_job_status(job_id: str, u=Depends(user)):
     if not row:
         raise HTTPException(404, "Upload job not found")
 
+    # The browser polls this endpoint throughout ingestion. Use the polling
+    # traffic to repair a queued job if the free worker was asleep, restarted,
+    # or missed its original wake-up request. The repair runs after the
+    # response so polling remains fast.
+    status = str(row.get("status") or "")
+    progress = int(row.get("progress") or 0)
+    if status == "queued" and progress <= 10:
+        try:
+            updated_at = parse_iso(row.get("updated_at") or "")
+            age_seconds = max(
+                0.0,
+                (utcnow() - updated_at).total_seconds(),
+            )
+        except Exception:
+            age_seconds = 999.0
+
+        if age_seconds >= 5:
+            background_tasks.add_task(_nudge_ingestion_job, job_id)
+
     result = jl(row.get("result") or "{}", {})
     return {
         "job_id": row["id"],
@@ -1142,7 +1184,7 @@ def upload_job_status(job_id: str, u=Depends(user)):
         "name": row["name"],
         "status": row["status"],
         "stage": row["stage"],
-        "progress": int(row.get("progress") or 0),
+        "progress": progress,
         "error": row.get("error"),
         "result": result,
         "created_at": row["created_at"],

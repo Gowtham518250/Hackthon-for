@@ -74,6 +74,26 @@ def _invalidate_client() -> None:
             pass
 
 
+def force_enqueue_job(job_id: str) -> bool:
+    """Ensure a queued job is present in Redis even if its pending marker
+    became stale or the list item was lost during a worker restart."""
+    client = _client()
+    if client is None:
+        return False
+
+    try:
+        # Remove only the dedup marker, then push the job again. The worker's
+        # status claim makes duplicate queue entries harmless.
+        client.srem(PENDING_SET, job_id)
+        client.sadd(PENDING_SET, job_id)
+        client.rpush(QUEUE_NAME, job_id)
+        return True
+    except Exception:
+        logger.exception("Could not force-enqueue ingestion job %s", job_id)
+        _invalidate_client()
+        return False
+
+
 def enqueue_job(job_id: str) -> bool:
     client = _client()
     if client is None:
