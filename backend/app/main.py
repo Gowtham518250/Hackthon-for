@@ -669,6 +669,12 @@ def _run_queued_job(job_id: str) -> None:
     if not claimed:
         return
 
+    logger.info(
+        "Ingestion job claimed job=%s file=%s",
+        job_id,
+        row["name"],
+    )
+
     stop_heartbeat = threading.Event()
     heartbeat = threading.Thread(
         target=_job_heartbeat,
@@ -729,6 +735,11 @@ def _process_upload_job(
             dest = Path(tmp) / f"{file_id}{ext}"
             storage.download_file(uploaded_uri, dest)
 
+            logger.info(
+                "Starting document extraction job=%s file=%s",
+                job_id,
+                safe_name,
+            )
             extract_started = time.perf_counter()
             text, refs, ocr, pages = extract(
                 dest,
@@ -739,6 +750,14 @@ def _process_upload_job(
                 ),
             )
             extract_ms = (time.perf_counter() - extract_started) * 1000
+            logger.info(
+                "Document extraction complete job=%s file=%s pages=%s ocr=%s extraction_ms=%.1f",
+                job_id,
+                safe_name,
+                pages,
+                bool(ocr),
+                extract_ms,
+            )
 
             if not text.strip():
                 _update_upload_job(
