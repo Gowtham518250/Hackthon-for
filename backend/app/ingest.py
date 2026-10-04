@@ -23,14 +23,14 @@ def _ocr_engine():
             _OCR = RapidOCR(
                 params={
                     "Global.log_level": "warning",
-                    "Global.max_side_len": 1280,
+                    "Global.use_cls": False,
+                    "Global.max_side_len": 736,
                     "EngineConfig.onnxruntime.intra_op_num_threads": 1,
                     "EngineConfig.onnxruntime.inter_op_num_threads": 1,
                     "EngineConfig.onnxruntime.enable_cpu_mem_arena": False,
-                    "Det.limit_side_len": 1280,
+                    "Det.limit_side_len": 736,
                     "Det.limit_type": "max",
-                    "Cls.cls_batch_num": 2,
-                    "Rec.rec_batch_num": 2,
+                    "Rec.rec_batch_num": 1,
                 }
             )
     return _OCR
@@ -40,7 +40,10 @@ def _ocr_image(image_bytes: bytes) -> str:
     try:
         with Image.open(BytesIO(image_bytes)) as source:
             image = source.convert("RGB")
-            result = _ocr_engine()(np.asarray(image))
+            result = _ocr_engine()(
+                np.asarray(image),
+                use_cls=False,
+            )
 
         if hasattr(result, "txts"):
             values = result.txts or ()
@@ -66,10 +69,33 @@ def extract(path: Path, progress_callback=None):
     if ext == ".pdf":
         with fitz.open(path) as doc:
             pages = len(doc)
+            native_pages: list[str] = []
+            native_refs: list[str] = []
+            native_chars = 0
+
+            # First pass: extract native PDF text without initializing OCR.
+            # Many PDFs contain mostly vector/text content with an occasional
+            # image-only page; OCR should not be loaded just because one page
+            # is blank to PyMuPDF.
             for i, page in enumerate(doc):
                 page_text = (page.get_text("text") or "").strip()
+                native_pages.append(page_text)
+                native_chars += len(page_text)
 
-                if not page_text:
+            native_coverage = (
+                sum(1 for value in native_pages if value) / max(1, pages)
+            )
+
+            use_ocr_fallback = (
+                pages > 0
+                and native_chars < max(1000, pages * 80)
+                and native_coverage < 0.5
+            )
+
+            for i, page in enumerate(doc):
+                page_text = native_pages[i]
+
+                if not page_text and use_ocr_fallback:
                     try:
                         # OCR each page at a moderate raster size to reduce
                         # transient memory pressure on small Render instances.
