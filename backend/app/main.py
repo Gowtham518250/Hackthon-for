@@ -80,6 +80,9 @@ if settings.storage_backend.lower() == "local":
 _RATE: dict[str, deque[float]] = defaultdict(deque)
 _NUDGE_LAST: dict[str, float] = {}
 _NUDGE_LOCK = threading.Lock()
+_WAKE_LAST: dict[str, float] = {}
+_WAKE_LOCK = threading.Lock()
+_WAKE_RETRY_SECONDS = 15
 
 
 def rate_limit(request: Request, bucket: str, limit: int) -> None:
@@ -96,11 +99,12 @@ def rate_limit(request: Request, bucket: str, limit: int) -> None:
     q.append(now_ts)
 
 
-def _wake_ingestion_worker() -> None:
+
+def _wake_ingestion_worker(job_id: str | None = None) -> None:
     url = settings.ingestion_worker_external_url.rstrip("/")
     if not url:
-        logger.warning(
-            "INGESTION_WORKER_EXTERNAL_URL is not configured; queued jobs depend on an already-running worker."
+        logger.error(
+            "Ingestion worker is not configured: INGESTION_WORKER_EXTERNAL_URL is empty"
         )
         return
 
@@ -114,16 +118,35 @@ def _wake_ingestion_worker() -> None:
             headers=headers,
             timeout=90.0,
         )
+        logger.info(
+            "Ingestion worker wake job=%s http=%s configured=%s",
+            job_id or "-",
+            response.status_code,
+            bool(settings.ingestion_worker_external_url),
+        )
         if response.status_code >= 400:
             logger.warning(
                 "Ingestion worker wake returned HTTP %s: %s",
                 response.status_code,
                 response.text[:300],
             )
-        else:
-            logger.info("Ingestion worker wake request succeeded")
     except Exception:
-        logger.exception("Could not wake external ingestion worker")
+        logger.exception(
+            "Could not wake ingestion worker job=%s url=%s",
+            job_id or "-",
+            url,
+        )
+
+
+def _maybe_wake_ingestion_worker(job_id: str) -> None:
+    now_ts = time.time()
+    with _WAKE_LOCK:
+        last = _WAKE_LAST.get(job_id, 0.0)
+        if now_ts - last < _WAKE_RETRY_SECONDS:
+            return
+        _WAKE_LAST[job_id] = now_ts
+
+    _wake_ingestion_worker(job_id)
 
 
 @app.on_event("startup")
@@ -819,7 +842,7 @@ async def upload(
 
         queued = enqueue_job(job_id)
         if queued:
-            background_tasks.add_task(_wake_ingestion_worker)
+            background_tasks.add_task(_maybe_wake_ingestion_worker, job_id)
         else:
             # Local development fallback: Redis is optional outside production.
             from .ingestion_worker import _process_upload_job
@@ -891,6 +914,7 @@ async def upload(
 @app.get("/api/files/upload-jobs/{job_id}")
 def upload_job_status(
     job_id: str,
+    background_tasks: BackgroundTasks,
     u=Depends(user),
 ):
     row = one(
@@ -900,6 +924,12 @@ def upload_job_status(
     )
     if not row:
         raise HTTPException(404, "Upload job not found")
+
+    # The status endpoint becomes self-healing for jobs waiting at 10%.
+    # This covers existing queued jobs and also wakes a sleeping Render
+    # worker after deployments or idle periods.
+    if row.get("status") == "queued":
+        background_tasks.add_task(_maybe_wake_ingestion_worker, job_id)
 
     result = jl(row.get("result") or "{}", {})
     progress = int(row.get("progress") or 0)
