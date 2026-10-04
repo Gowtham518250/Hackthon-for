@@ -1339,6 +1339,12 @@ def delete_file(file_id: str, u=Depends(user)):
         "DELETE FROM chunks WHERE file_id=? AND user_id=?",
         (file_id, u["id"]),
     )
+    # Remove the durable job row as well. Otherwise deleted files leave
+    # queued upload jobs behind, which can rebuild a large Redis backlog.
+    exe(
+        "DELETE FROM upload_jobs WHERE file_id=? AND user_id=?",
+        (file_id, u["id"]),
+    )
     exe(
         "DELETE FROM files WHERE id=? AND user_id=?",
         (file_id, u["id"]),
