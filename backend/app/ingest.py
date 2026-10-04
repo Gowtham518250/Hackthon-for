@@ -2,6 +2,7 @@ from io import BytesIO
 from pathlib import Path
 from threading import RLock
 import gc
+import os
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,19 @@ def _ocr_engine():
     with _OCR_LOCK:
         if _OCR is None:
             from rapidocr import RapidOCR
-            _OCR = RapidOCR()
+            _OCR = RapidOCR(
+                params={
+                    "Global.log_level": "warning",
+                    "Global.max_side_len": 1280,
+                    "EngineConfig.onnxruntime.intra_op_num_threads": 1,
+                    "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+                    "EngineConfig.onnxruntime.enable_cpu_mem_arena": False,
+                    "Det.limit_side_len": 1280,
+                    "Det.limit_type": "max",
+                    "Cls.cls_batch_num": 2,
+                    "Rec.rec_batch_num": 2,
+                }
+            )
     return _OCR
 
 
@@ -44,7 +57,7 @@ def _ocr_image(image_bytes: bytes) -> str:
         return ""
 
 
-def extract(path: Path):
+def extract(path: Path, progress_callback=None):
     ext = path.suffix.lower()
     text = ""
     refs = []
@@ -76,6 +89,17 @@ def extract(path: Path):
                         page_text = ""
                     finally:
                         gc.collect()
+
+                if progress_callback:
+                    try:
+                        # Reserve 25-40% of the pipeline for document extraction
+                        # so scanned PDFs show live page-level progress instead
+                        # of appearing frozen at 25%.
+                        progress_callback(
+                            25 + int(15 * (i + 1) / max(1, pages))
+                        )
+                    except Exception:
+                        pass
 
                 if page_text:
                     text += (
