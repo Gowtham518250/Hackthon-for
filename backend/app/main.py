@@ -652,29 +652,22 @@ def _run_queued_job(job_id: str) -> None:
         logger.warning("Queued ingestion job %s no longer exists", job_id)
         return
 
-    if row["status"] != "queued":
-        return
-
+    # Atomically claim the queued job. This prevents duplicate processing if
+    # the old free-worker web service and the embedded API worker both see the
+    # same Redis queue entry during a deployment transition.
+    claim_time = now()
     claimed = one(
-        """
-        SELECT id
-        FROM upload_jobs
-        WHERE id=? AND status='queued'
-        """,
-        (job_id,),
-    )
-    if not claimed:
-        return
-
-    exe(
         """
         UPDATE upload_jobs
         SET status='processing', stage='extracting', progress=25,
             error=NULL, updated_at=?
         WHERE id=? AND status='queued'
+        RETURNING id
         """,
-        (now(), job_id),
+        (claim_time, job_id),
     )
+    if not claimed:
+        return
 
     stop_heartbeat = threading.Event()
     heartbeat = threading.Thread(
