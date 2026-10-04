@@ -2,7 +2,7 @@ import shutil
 from pathlib import Path
 
 from .config import settings
-from .db import exe, one, now
+from .db import exe, one, now, is_postgres
 
 try:
     import boto3
@@ -20,6 +20,14 @@ class ObjectStorage:
 
     def __init__(self) -> None:
         self.backend = settings.storage_backend.lower()
+
+        # Render production must never depend on the instance filesystem.
+        # If PostgreSQL is configured but an older deployment forgot to set
+        # STORAGE_BACKEND=database, automatically use the durable database
+        # blob store instead of the ephemeral local filesystem.
+        if self.backend == "local" and is_postgres():
+            self.backend = "database"
+
         self._client = None
 
         if self.backend == "s3":
