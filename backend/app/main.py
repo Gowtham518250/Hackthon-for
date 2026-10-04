@@ -1,5 +1,6 @@
 import uuid
 import hashlib
+import httpx
 import logging
 import re
 import time
@@ -79,6 +80,25 @@ if settings.storage_backend.lower() == "local":
     Path(settings.local_storage_dir).mkdir(parents=True, exist_ok=True)
 
 _RATE: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _wake_ingestion_service() -> None:
+    hostport = os.getenv("INGESTION_WORKER_HOSTPORT", "").strip()
+    if not hostport:
+        return
+
+    try:
+        # Best-effort wake-up for the free-plan web worker. A sleeping Render
+        # web service can be started by an internal HTTP request. The upload
+        # must never fail just because the worker takes longer than this
+        # short wake-up timeout to boot.
+        with httpx.Client(timeout=2.0) as client:
+            client.get(f"http://{hostport}/health")
+    except Exception:
+        logger.info(
+            "Ingestion worker wake-up request did not complete immediately",
+            exc_info=True,
+        )
 
 
 def rate_limit(request: Request, bucket: str, limit: int) -> None:
@@ -1030,7 +1050,9 @@ async def upload(
         )
 
         queued = enqueue_job(job_id)
-        if not queued:
+        if queued:
+            _wake_ingestion_service()
+        else:
             background_tasks.add_task(
                 _process_upload_job,
                 job_id,
