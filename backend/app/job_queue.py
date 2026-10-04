@@ -173,7 +173,7 @@ def recover_jobs() -> dict[str, int]:
         SELECT id
         FROM upload_jobs
         WHERE status='queued'
-        ORDER BY created_at ASC
+        ORDER BY created_at DESC
         LIMIT 100
         """
     )
