@@ -57,15 +57,15 @@ services:
       - key: DEBUG
         value: "false"
 
-  - type: worker
+  - type: web
     name: deepsearch-ingestion-worker
     runtime: python
     plan: free
     region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.worker
-    maxShutdownDelaySeconds: 300
+    startCommand: python -m app.worker_http
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.11"
