@@ -22,11 +22,11 @@ services:
           name: deepsearch-redis
           type: keyvalue
           property: connectionString
-      - key: INGESTION_WORKER_EXTERNAL_HOST
+      - key: INGESTION_WORKER_EXTERNAL_URL
         fromService:
           name: deepsearch-ingestion-worker
           type: web
-          envVarKey: RENDER_EXTERNAL_HOSTNAME
+          envVarKey: RENDER_EXTERNAL_URL
       - key: INGESTION_WORKER_WAKE_TOKEN
         fromService:
           name: deepsearch-ingestion-worker
