@@ -9,8 +9,11 @@ from .db import all_, exe, now
 
 logger = logging.getLogger("deepsearch.queue")
 
-QUEUE_NAME = "deepsearch:ingestion:jobs"
-PENDING_SET = "deepsearch:ingestion:pending"
+# Version the queue namespace so stale job IDs from earlier deployments are
+# never consumed by the current worker. Existing valid PostgreSQL jobs are
+# re-enqueued into this fresh namespace by recover_jobs().
+QUEUE_NAME = "deepsearch:ingestion:jobs:v2"
+PENDING_SET = "deepsearch:ingestion:pending:v2"
 STALE_AFTER_SECONDS = 2 * 60
 RECOVERY_INTERVAL_SECONDS = 15
 REDIS_CONNECT_TIMEOUT_SECONDS = 3
