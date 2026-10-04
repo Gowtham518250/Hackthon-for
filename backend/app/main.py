@@ -81,6 +81,8 @@ if settings.storage_backend.lower() == "local":
     Path(settings.local_storage_dir).mkdir(parents=True, exist_ok=True)
 
 _RATE: dict[str, deque[float]] = defaultdict(deque)
+_NUDGE_LAST: dict[str, float] = {}
+_NUDGE_LOCK = threading.Lock()
 
 
 def _wake_ingestion_service() -> bool:
@@ -115,6 +117,13 @@ def _wake_ingestion_service() -> bool:
 
 def _nudge_ingestion_job(job_id: str) -> None:
     """Repair a queued job after a sleeping/restarted free worker."""
+    now_ts = time.time()
+    with _NUDGE_LOCK:
+        last = _NUDGE_LAST.get(job_id, 0.0)
+        if now_ts - last < 10.0:
+            return
+        _NUDGE_LAST[job_id] = now_ts
+
     if force_enqueue_job(job_id):
         _wake_ingestion_service()
 
