@@ -1,6 +1,7 @@
 from io import BytesIO
 from pathlib import Path
 from threading import RLock
+import gc
 
 import numpy as np
 import pandas as pd
@@ -25,8 +26,9 @@ def _ocr_engine():
 
 def _ocr_image(image_bytes: bytes) -> str:
     try:
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        result = _ocr_engine()(np.asarray(image))
+        with Image.open(BytesIO(image_bytes)) as source:
+            image = source.convert("RGB")
+            result = _ocr_engine()(np.asarray(image))
 
         if hasattr(result, "txts"):
             values = result.txts or ()
@@ -60,17 +62,20 @@ def extract(path: Path):
                         # OCR each page at a moderate raster size to reduce
                         # transient memory pressure on small Render instances.
                         pix = page.get_pixmap(
-                            matrix=fitz.Matrix(1.25, 1.25),
+                            matrix=fitz.Matrix(1.0, 1.0),
                             alpha=False,
                         )
                         image_bytes = pix.tobytes("png")
                         del pix
                         page_text = _ocr_image(image_bytes)
                         del image_bytes
+                        gc.collect()
                         if page_text:
                             ocr = True
                     except Exception:
                         page_text = ""
+                    finally:
+                        gc.collect()
 
                 if page_text:
                     text += (
