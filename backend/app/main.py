@@ -730,7 +730,14 @@ def _process_upload_job(
             storage.download_file(uploaded_uri, dest)
 
             extract_started = time.perf_counter()
-            text, refs, ocr, pages = extract(dest)
+            text, refs, ocr, pages = extract(
+                dest,
+                progress_callback=lambda progress: _update_upload_job(
+                    job_id,
+                    stage="extracting",
+                    progress=progress,
+                ),
+            )
             extract_ms = (time.perf_counter() - extract_started) * 1000
 
             if not text.strip():
